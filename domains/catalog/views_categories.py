@@ -12,6 +12,9 @@ from .models import Category, Product
 from .serializers import (
     CategorySerializer, CategoryWriteSerializer, CategoryNodeSerializer
 )
+from drf_spectacular.utils import extend_schema, extend_schema_view
+
+
 
 
 class CategoryListCreateAPI(generics.ListCreateAPIView):
@@ -72,6 +75,7 @@ class CategoryDetailAPI(generics.RetrieveUpdateDestroyAPIView):
     PATCH  /api/v1/categories/{id}      (관리자)
     DELETE /api/v1/categories/{id}      (관리자, 자식/상품 연결 시 409)
     """
+    http_method_names = ["get", "patch", "delete", "head", "options"]
     lookup_url_kwarg = "category_id"
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
