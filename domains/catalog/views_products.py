@@ -9,6 +9,7 @@ from .models import Product
 from .serializers import ProductReadSerializer, ProductWriteSerializer
 from shared.pagination import StandardResultsSetPagination
 from django_filters.rest_framework import DjangoFilterBackend
+from drf_spectacular.utils import extend_schema, extend_schema_view
 
 class ProductFilter(df.FilterSet):
     q = df.CharFilter(method="filter_q")
@@ -59,6 +60,7 @@ class ProductListCreateAPI(generics.ListCreateAPIView):
         return super().post(*args, **kwargs)
 
 class ProductDetailAPI(generics.RetrieveUpdateDestroyAPIView):
+    http_method_names = ["get", "patch", "delete", "head", "options"]
     lookup_url_kwarg = "product_id"
     queryset = Product.objects.all()
     serializer_class = ProductReadSerializer
