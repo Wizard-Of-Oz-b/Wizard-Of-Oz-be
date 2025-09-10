@@ -72,3 +72,53 @@ class ProductSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
         fields = ["product_id", "name", "description", "price", "category", "is_active", "created_at"]
+
+class ProductReadSerializer(serializers.ModelSerializer):
+    # 외부로는 category_id를 숫자로 노출 (주의: source 지정 X)
+    category_id = serializers.IntegerField(read_only=True)
+    category_name = serializers.CharField(source="category.name", read_only=True)
+
+    class Meta:
+        model = Product
+        fields = [
+            "product_id", "name", "description", "price",
+            "category_id", "category_name", "is_active", "created_at"
+        ]
+
+class ProductWriteSerializer(serializers.ModelSerializer):
+    # 입력은 category_id 숫자로 받음
+    category_id = serializers.IntegerField(required=False, allow_null=True)
+    price = serializers.IntegerField(min_value=0)
+
+    class Meta:
+        model = Product
+        # model 필드엔 category가 있지만, 입력은 category_id로 받는다
+        fields = ["name", "description", "price", "category_id", "is_active"]
+
+    def validate_category_id(self, value):
+        if value is None:
+            return value
+        if not Category.objects.filter(pk=value).exists():
+            raise serializers.ValidationError("category not found")
+        return value
+
+    def create(self, validated_data):
+        category_id = validated_data.pop("category_id", None)
+        obj = Product(**validated_data)
+        obj.category_id = category_id
+        obj.save()
+        return obj
+
+    def update(self, instance, validated_data):
+        if "name" in validated_data:
+            instance.name = validated_data["name"]
+        if "description" in validated_data:
+            instance.description = validated_data["description"]
+        if "price" in validated_data:
+            instance.price = validated_data["price"]
+        if "is_active" in validated_data:
+            instance.is_active = validated_data["is_active"]
+        if "category_id" in validated_data:
+            instance.category_id = validated_data["category_id"]
+        instance.save()
+        return instance
