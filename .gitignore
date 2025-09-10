@@ -1,0 +1,25 @@
+# Python / Django
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.env
+*.sqlite3
+db.sqlite3
+
+# Django/DRF artifacts
+staticfiles/
+media/
+*.log
+
+# Tools / IDE
+.vscode/
+.idea/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+coverage/
+coverage.xml
+
+# Docker (로컬 바인딩 디렉토리 쓰는 경우 대비)
+pgdata/
