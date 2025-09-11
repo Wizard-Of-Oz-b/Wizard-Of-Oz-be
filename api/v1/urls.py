@@ -3,20 +3,24 @@ from django.urls import path, include
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 urlpatterns = [
-    path("", include("domains.accounts.urls")),          # /auth..., /users/me...
-    path("categories/", include("domains.catalog.urls")),# ← 하나로
-    path("products/",   include("domains.catalog.urls")),# ← 하나로
-    # JWT
+    # Auth
+    path("auth/", include(("domains.accounts.urls_auth", "accounts_auth"))),
     path("auth/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("auth/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
-    path("auth/", include("domains.accounts.urls")),
-    path("users/", include("domains.accounts.urls")),      # 초기엔 같은 urls에 두셔도 돼요
-    path("products/", include("domains.catalog.urls_products")),
-    path("products/", include("domains.catalog.urls")),
-    path("reviews/", include("domains.reviews.urls")),
-    path("purchases/", include("domains.orders.urls")),
-    path("admins/",     include("domains.staff.urls")),
-    path("admin-logs/", include("domains.staff.urls")),
-    path("", include("domains.reviews.urls")),   # products/{id}/reviews, reviews/{id}
-    path("", include("domains.orders.urls")),    # purchases...
+
+    # Users
+    path("users/", include(("domains.accounts.urls_users", "accounts_users"))),
+
+    # Catalog
+    path("categories/", include(("domains.catalog.urls_categories", "catalog_categories"))),
+    path("products/",   include(("domains.catalog.urls_products", "catalog_products"))),
+
+    # Reviews
+    path("reviews/", include(("domains.reviews.urls", "reviews"))),
+
+    # Orders
+    path("orders/", include(("domains.orders.urls", "orders"))),
+
+    # Staff/Admin (API용 관리 엔드포인트)  → /api/v1/admin/...
+    path("admin/", include(("domains.staff.urls", "staff"))),
 ]
