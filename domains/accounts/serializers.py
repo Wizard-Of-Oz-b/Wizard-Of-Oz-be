@@ -1,9 +1,11 @@
-from django.contrib.auth import get_user_model
-from django.contrib.auth.hashers import check_password
 from django.contrib.auth.base_user import BaseUserManager
-from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
-
+from django.contrib.auth.hashers import check_password
+from rest_framework import serializers
+from django.contrib.auth import get_user_model
+from .models import SocialAccount
+from rest_framework import serializers
+from .models import User
 User = get_user_model()
 
 
@@ -84,7 +86,66 @@ class LoginSerializer(serializers.Serializer):
 
 
 class MeSerializer(serializers.ModelSerializer):
+    # first_name 을 name 으로 노출
+    name = serializers.CharField(source="first_name", read_only=True)
+
     class Meta:
         model = User
-        fields = ("email", "nickname", "phone_number", "address", "status", "created_at", "updated_at")
+        fields = ("email", "name", "nickname", "phone_number", "address",
+                  "status", "created_at", "updated_at")
         read_only_fields = ("email", "status", "created_at", "updated_at")
+
+# 수정용
+class MeUpdateSerializer(serializers.ModelSerializer):
+    # 쓰기 허용 필드
+    name = serializers.CharField(source="first_name", required=False, allow_blank=True, max_length=150)
+    nickname = serializers.CharField(required=False, allow_blank=True, max_length=150)
+    phone_number = serializers.CharField(required=False, allow_blank=True, max_length=50)
+    address = serializers.CharField(required=False, allow_blank=True)
+
+    # 비밀번호 변경(옵션)
+    current_password = serializers.CharField(write_only=True, required=False, trim_whitespace=False)
+    new_password = serializers.CharField(write_only=True, required=False, min_length=8, max_length=16, trim_whitespace=False)
+
+    class Meta:
+        model = User
+        fields = ("name", "nickname", "phone_number", "address", "current_password", "new_password")
+
+    def validate(self, data):
+        cur = data.get("current_password")
+        new = data.get("new_password")
+        if (cur is None) ^ (new is None):
+            raise serializers.ValidationError({"new_password": "current_password와 new_password는 함께 보내야 합니다."})
+        if new:
+            user = self.instance or self.context.get("request").user
+            if not check_password(cur or "", user.password):
+                raise serializers.ValidationError({"current_password": "현재 비밀번호가 올바르지 않습니다."})
+            validate_password(new, user=user)  # 우리의 커스텀 복잡도 검증기도 함께 적용됨
+        return data
+
+    def update(self, instance, validated):
+        # 일반 필드
+        for f in ("first_name", "nickname", "phone_number", "address"):
+            if f in validated:
+                setattr(instance, f, validated[f])
+
+        # 비밀번호
+        new = validated.get("new_password")
+        if new:
+            instance.set_password(new)
+
+        instance.save()
+        return instance
+
+class SocialAccountSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SocialAccount
+        fields = ("id", "provider", "provider_uid", "email", "created_at")
+        read_only_fields = fields
+
+class UserMeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        # 노출하고 싶은 필드만 (예시)
+        fields = ["id", "email", "username", "nickname", "avatar_url", "created_at", "updated_at"]
+        read_only_fields = ["id", "email", "created_at", "updated_at"]
