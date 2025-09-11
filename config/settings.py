@@ -3,7 +3,6 @@ import os
 from pathlib import Path
 from datetime import timedelta
 from dotenv import load_dotenv
-import dj_database_url
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Base & Env
@@ -14,7 +13,7 @@ load_dotenv(BASE_DIR / ".env")
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-secret")
 DEBUG = os.getenv("DEBUG", "1") == "1"
 
-ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",")
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Applications
@@ -208,30 +207,3 @@ AUTH_PASSWORD_VALIDATORS = [
     # (원하면 추가) {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     # MinimumLength/Numeric은 우리 커스텀에 포함되어 있으니 보통 안 넣습니다.
 ]
-
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except Exception:
-    pass
-
-# DATABASES 설정
-if os.getenv("DATABASE_URL"):
-    DATABASES = {
-        "default": dj_database_url.parse(os.environ["DATABASE_URL"], conn_max_age=600),
-    }
-else:
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.postgresql",
-            "NAME": os.getenv("POSTGRES_DB", "shopapi"),
-            "USER": os.getenv("POSTGRES_USER", "shop"),
-            "PASSWORD": os.getenv("POSTGRES_PASSWORD", "secret"),
-            "HOST": os.getenv("POSTGRES_HOST", "db"),
-            "PORT": os.getenv("POSTGRES_PORT", "5432"),
-        }
-    }
-
-CSRF_TRUSTED_ORIGINS = os.getenv(
-    "CSRF_TRUSTED_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000"
-).split(",")

@@ -26,6 +26,7 @@ class Product(models.Model):
     category = models.ForeignKey(Category, null=True, blank=True,
                                  on_delete=models.SET_NULL, db_column="category_id",
                                  related_name="products")
+    options = models.JSONField(default=list, blank=True)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     class Meta:
