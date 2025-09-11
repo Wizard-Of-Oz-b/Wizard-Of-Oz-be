@@ -23,3 +23,6 @@ coverage.xml
 
 # Docker (로컬 바인딩 디렉토리 쓰는 경우 대비)
 pgdata/
+.env*
+!.env.example
+!.env.*.example
