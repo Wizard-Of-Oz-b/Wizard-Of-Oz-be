@@ -41,18 +41,27 @@ class RegisterSerializer(serializers.ModelSerializer):
         model = User
         fields = ("email", "password", "nickname", "phone_number", "address")
 
+
     def validate(self, data):
-        # user context를 넣으면 UserAttributeSimilarityValidator 등과 연동 가능
-        temp_user = User(email=(data.get("email") or "").lower())
-        try:
-            validate_password(data["password"], user=temp_user)  # ✅ 전역 검증기 실행 (우리 커스텀 포함)
-        except Exception as e:
-            # DRF 형식으로 에러 표준화
-            from django.core.exceptions import ValidationError as DjangoVE
-            if isinstance(e, DjangoVE):
-                raise serializers.ValidationError({"password": e.messages})
-            raise
+        # 전역 비밀번호 검증기(복잡도 포함) 실행
+        temp_user = User(email=normalize_email(data.get("email", "")))
+        validate_password(data["password"], user=temp_user)
         return data
+
+    def create(self, validated):
+        email = normalize_email(validated["email"])
+        password = validated["password"]
+
+        user = User(
+            email=email,
+            username=email,  # ✅ 핵심: username을 반드시 채움(UNIQUE 충돌 방지)
+            nickname=validated.get("nickname", ""),
+            phone_number=validated.get("phone_number", ""),
+            address=validated.get("address", ""),
+        )
+        user.set_password(password)
+        user.save(using=self.context.get("using") or "default")
+        return user
 
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()

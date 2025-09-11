@@ -1,7 +1,10 @@
+# domains/reviews/urls.py
 from django.urls import path
-from .views import ProductReviewListCreateAPI, ReviewDetailAPI
+from .views import ReviewDetailAPI
+
+app_name = "reviews"
 
 urlpatterns = [
-    path("products/<int:product_id>/reviews", ProductReviewListCreateAPI.as_view()),
-    path("reviews/<int:review_id>", ReviewDetailAPI.as_view()),
+    # /api/v1/reviews/<review_id>/
+    path("<int:review_id>/", ReviewDetailAPI.as_view(), name="detail"),
 ]
