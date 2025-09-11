@@ -70,7 +70,8 @@ class ProductDetailAPI(generics.RetrieveUpdateDestroyAPIView):
         return [permissions.IsAdminUser()] if self.request.method in ("PATCH", "DELETE") else [permissions.AllowAny()]
 
     def get_serializer_class(self):
-        return ProductWriteSerializer if self.request.method == "PATCH" else ProductReadSerializer
+        # 🔑 수정(PATCH/PUT) 시에는 반드시 쓰기용
+        return ProductWriteSerializer if self.request.method in ("PATCH", "PUT") else ProductReadSerializer
 
     @extend_schema(operation_id="RetrieveProduct", responses={200: ProductReadSerializer})
     def get(self, *args, **kwargs):
