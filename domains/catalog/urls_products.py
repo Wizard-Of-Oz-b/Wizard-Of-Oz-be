@@ -1,5 +1,6 @@
 from django.urls import path
 from .views_products import ProductListCreateAPI, ProductDetailAPI
+from ..reviews.views import ProductReviewListCreateAPI
 
 app_name = "catalog_products"
 
@@ -12,4 +13,6 @@ urlpatterns = [
     # PATCH /api/v1/products/{id}
     # DELETE /api/v1/products/{id}
     path("<int:product_id>/", ProductDetailAPI.as_view(), name="detail"),
+    path("<int:product_id>/reviews/", ProductReviewListCreateAPI.as_view()),  # ← 추가
+
 ]
