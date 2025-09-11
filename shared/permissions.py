@@ -50,35 +50,5 @@ class IsSuperAdmin(BasePermission):
 
 # ✅ 다시 추가: object-level 권한
 class IsOwnerOrAdmin(BasePermission):
-    """
-    객체 권한:
-      - Django superuser 이거나
-      - admin_profile 존재(임의 role) 이거나
-      - obj의 소유자가 현재 사용자일 때 허용
-    """
-    def has_permission(self, request, view):
-        # 객체 단위 검사 전에 최소한 인증은 요구
-        return bool(request.user and request.user.is_authenticated)
-
     def has_object_permission(self, request, view, obj):
-        u = request.user
-        # 관리자는 무조건 패스
-        if getattr(u, "is_superuser", False) or _get_admin_profile(u):
-            return True
-
-        # 소유자 판정: 흔한 필드명 순서대로 체크
-        if hasattr(obj, "user_id"):
-            return obj.user_id == u.id
-        if hasattr(obj, "user"):
-            return getattr(obj.user, "id", None) == u.id
-        if hasattr(obj, "owner_id"):
-            return obj.owner_id == u.id
-        if hasattr(obj, "owner"):
-            return getattr(obj.owner, "id", None) == u.id
-        if hasattr(obj, "created_by_id"):
-            return obj.created_by_id == u.id
-        if hasattr(obj, "created_by"):
-            return getattr(obj.created_by, "id", None) == u.id
-
-        return False
-
+            return False

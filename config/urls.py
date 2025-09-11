@@ -5,6 +5,7 @@ from django.views.generic import RedirectView
 from django.http import HttpResponse
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from domains.accounts.views_social import SocialLoginView, SocialUnlinkView
+from django.http import JsonResponse
 
 def oauth_debug_callback(request):
     code = request.GET.get("code")
@@ -33,3 +34,6 @@ urlpatterns = [
     path("api/v1/auth/social/<str:provider>/unlink", SocialUnlinkView.as_view(), name="social-unlink"),
 
 ]
+
+def healthz(_): return JsonResponse({"ok": True})
+urlpatterns += [path("healthz/", healthz)]

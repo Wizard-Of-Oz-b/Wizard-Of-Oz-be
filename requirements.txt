@@ -33,3 +33,7 @@ social-auth-core==4.7.0
 sqlparse==0.5.3
 uritemplate==4.2.0
 urllib3==2.5.0
+dj-database-url
+python-dotenv
+gunicorn
+uvicorn[standard]
