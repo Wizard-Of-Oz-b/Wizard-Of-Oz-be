@@ -17,14 +17,23 @@ class User(AbstractUser):
         db_table = "users"
 
 class SocialAccount(models.Model):
-    PROVIDER_CHOICES = [("google", "Google"), ("naver", "Naver"), ("kakao", "Kakao")]
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="social_accounts")
+    PROVIDER_CHOICES = (
+        ("google", "Google"),
+        ("naver", "Naver"),
+        ("kakao", "Kakao"),
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="social_accounts",
+    )
     provider = models.CharField(max_length=20, choices=PROVIDER_CHOICES)
     provider_uid = models.CharField(max_length=128)
     email = models.EmailField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        db_table = "social_accounts"
         unique_together = (("provider", "provider_uid"),)
         indexes = [models.Index(fields=["provider", "provider_uid"])]
 

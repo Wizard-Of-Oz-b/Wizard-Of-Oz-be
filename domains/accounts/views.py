@@ -1,19 +1,25 @@
 # domains/accounts/views.py
-from django.contrib.auth import get_user_model
-from rest_framework import permissions, status, generics
-from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from drf_spectacular.utils import extend_schema, OpenApiResponse
+from django_filters.rest_framework import DjangoFilterBackend
 
+import django_filters as df
 from .serializers import (
     RegisterSerializer, LoginSerializer, MeSerializer,
     EmptySerializer, LoginRequestSerializer,
     TokenPairResponseSerializer,
 )
 from .utils import refresh_cookie_kwargs  # ✅ 여기서 가져옴
+from .models import SocialAccount
+from rest_framework import generics, permissions, status, filters
+from rest_framework.response import Response
+from drf_spectacular.utils import extend_schema
+from django.contrib.auth import get_user_model
+from .serializers import MeSerializer, MeUpdateSerializer, SocialAccountSerializer
 
 User = get_user_model()
+
 
 
 @extend_schema(
@@ -91,27 +97,97 @@ class LogoutView(APIView):
         return resp
 
 
-@extend_schema(responses={200: MeSerializer})
-class MeView(APIView):
+class MeView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    GET   /api/v1/users/me/      내 프로필 조회
+    PATCH /api/v1/users/me/      이름/닉네임/전화/주소 수정 & (옵션) 비밀번호 변경
+    DELETE/api/v1/users/me/      소프트 삭제(status=deleted, is_active=False)
+    """
     permission_classes = [permissions.IsAuthenticated]
+    http_method_names = ["get", "patch", "delete", "head", "options"]
 
-    def get(self, request):
-        return Response(MeSerializer(request.user).data)
+    def get_object(self):
+        return self.request.user
 
-    @extend_schema(request=MeSerializer, responses={200: MeSerializer})
-    def patch(self, request):
-        ser = MeSerializer(instance=request.user, data=request.data, partial=True)
-        ser.is_valid(raise_exception=True)
-        ser.save()
-        return Response(ser.data)
+    def get_serializer_class(self):
+        return MeUpdateSerializer if self.request.method == "PATCH" else MeSerializer
 
-    @extend_schema(request=EmptySerializer, responses={204: OpenApiResponse(description="탈퇴 완료")})
-    def delete(self, request):
-        u = request.user
-        if hasattr(u, "status"):
-            u.status = "deleted"
-        u.is_active = False
-        u.save(update_fields=["is_active"] + (["status"] if hasattr(u, "status") else []))
-        resp = Response(status=204)
-        resp.delete_cookie("refresh", path="/api/v1/auth/")
-        return resp
+    @extend_schema(operation_id="GetMe", responses={200: MeSerializer})
+    def get(self, *args, **kwargs):
+        return super().get(*args, **kwargs)
+
+    @extend_schema(operation_id="UpdateMe", request=MeUpdateSerializer, responses={200: MeSerializer})
+    def patch(self, request, *args, **kwargs):
+        kwargs["partial"] = True
+        return super().patch(request, *args, **kwargs)
+
+    @extend_schema(operation_id="DeleteMe", responses={204: None})
+    def delete(self, request, *args, **kwargs):
+        user = self.get_object()
+        user.status = "deleted"
+        if hasattr(user, "is_active"):
+            user.is_active = False
+        user.save(update_fields=["status", "is_active", "updated_at"] if hasattr(user, "is_active") else ["status", "updated_at"])
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# ---------- 내 소셜 연동 ----------
+class MySocialAccountListAPI(generics.ListAPIView):
+    """
+    GET /api/v1/users/me/social-accounts/
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = SocialAccountSerializer
+
+    def get_queryset(self):
+        return SocialAccount.objects.filter(user=self.request.user).order_by("provider", "created_at")
+
+
+class MySocialAccountDeleteAPI(generics.DestroyAPIView):
+    """
+    DELETE /api/v1/users/me/social-accounts/{social_id}/
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = SocialAccountSerializer
+    lookup_url_kwarg = "social_id"
+
+    def get_queryset(self):
+        # 내 것만 삭제 가능
+        return SocialAccount.objects.filter(user=self.request.user)
+
+
+# ---------- 관리자용: 사용자 목록/조회 ----------
+class UserFilter(df.FilterSet):
+    email = df.CharFilter(field_name="email", lookup_expr="icontains")
+    nickname = df.CharFilter(field_name="nickname", lookup_expr="icontains")
+    status = df.CharFilter(field_name="status")
+    created_from = df.IsoDateTimeFilter(field_name="created_at", lookup_expr="gte")
+    created_to = df.IsoDateTimeFilter(field_name="created_at", lookup_expr="lte")
+
+    class Meta:
+        model = User
+        fields = ["email", "nickname", "status", "created_from", "created_to"]
+
+
+class UserListAdminAPI(generics.ListAPIView):
+    """
+    GET /api/v1/users/   (Admin)
+      - ?email=, ?nickname=, ?status=, ?created_from=, ?created_to=
+    """
+    permission_classes = [permissions.IsAdminUser]
+    queryset = User.objects.all().order_by("-created_at")
+    serializer_class = MeSerializer
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter, filters.SearchFilter]
+    filterset_class = UserFilter
+    search_fields = ["email", "nickname"]
+    ordering_fields = ["created_at", "email"]
+
+
+class UserDetailAdminAPI(generics.RetrieveAPIView):
+    """
+    GET /api/v1/users/{user_id}  (Admin)
+    """
+    permission_classes = [permissions.IsAdminUser]
+    queryset = User.objects.all()
+    serializer_class = MeSerializer
+    lookup_url_kwarg = "user_id"
