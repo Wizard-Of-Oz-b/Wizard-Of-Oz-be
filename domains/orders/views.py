@@ -60,15 +60,22 @@ class PurchaseListCreateAPI(generics.ListCreateAPIView):
 
 # ---- 내 구매 목록 / 상세 ----
 class PurchaseMeListAPI(generics.ListAPIView):
-    """
-    GET /api/v1/purchases/me   (로그인 사용자 본인 구매 목록)
-    """
+    """GET /api/v1/purchases/me  (로그인 사용자의 본인 구매 목록)"""
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = PurchaseReadSerializer
     pagination_class = StandardResultsSetPagination
 
+    # ✅ 스키마 생성 시 모델 추론용 안전 기본값
+    queryset = Purchase.objects.none()
+
     def get_queryset(self):
-        return Purchase.objects.filter(user=self.request.user).order_by("-purchased_at")
+        # ✅ 스키마 생성 중이거나 비인증이면 빈 쿼리셋
+        if getattr(self, "swagger_fake_view", False) or not self.request.user.is_authenticated:
+            return Purchase.objects.none()
+        # 성능/타입 안전을 위해 user_id로 필터 권장(= int)
+        return (Purchase.objects
+                .filter(user_id=self.request.user.id)   # ← 기존 user=self.request.user 도 동작은 OK
+                .order_by("-purchased_at"))
 
 
 class PurchaseDetailAPI(generics.RetrieveAPIView):
@@ -89,7 +96,8 @@ class PurchaseCancelAPI(generics.UpdateAPIView):
     lookup_url_kwarg = "purchase_id"
     queryset = Purchase.objects.all()
     permission_classes = [IsOwnerOrAdmin]
-    serializer_class = PurchaseReadSerializer  # 응답 전용
+    serializer_class = PurchaseReadSerializer
+    http_method_names = ["patch", "options", "head"]
 
     @transaction.atomic
     def patch(self, request, *args, **kwargs):
@@ -109,6 +117,7 @@ class PurchaseRefundAPI(generics.UpdateAPIView):
     queryset = Purchase.objects.all()
     permission_classes = [permissions.IsAdminUser]  # 관리자/CS만
     serializer_class = PurchaseReadSerializer
+    http_method_names = ["get", "patch", "delete", "options", "head"]
 
     @transaction.atomic
     def patch(self, request, *args, **kwargs):

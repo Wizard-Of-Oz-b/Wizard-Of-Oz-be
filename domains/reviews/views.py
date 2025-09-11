@@ -74,6 +74,7 @@ class ReviewDetailAPI(generics.RetrieveUpdateDestroyAPIView):
     lookup_url_kwarg = "review_id"
     queryset = Review.objects.all()
     permission_classes = [IsOwnerOrAdmin]
+    http_method_names = ["get", "patch", "delete", "options", "head"]
 
     def get_serializer_class(self):
         # 부분 수정(평점/내용)
