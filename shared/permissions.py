@@ -51,4 +51,8 @@ class IsSuperAdmin(BasePermission):
 # ✅ 다시 추가: object-level 권한
 class IsOwnerOrAdmin(BasePermission):
     def has_object_permission(self, request, view, obj):
-            return False
+        return (
+                getattr(request.user, "is_superuser", False)
+                or getattr(request.user, "is_staff", False)
+                or obj.user_id == getattr(request.user, "id", None)
+        )

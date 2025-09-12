@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 # Base & Env
 # ──────────────────────────────────────────────────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / ".env")   # .env 로드
 
 # 1) (선택) 컨테이너에서만 .env.docker 읽게 하거나, 아예 주석 처리
 # from dotenv import load_dotenv
@@ -90,17 +91,24 @@ ASGI_APPLICATION = "config.asgi.application"
 # ──────────────────────────────────────────────────────────────────────────────
 # Database (PostgreSQL)
 # ──────────────────────────────────────────────────────────────────────────────
+def env_multi(*keys, default=None):
+    for k in keys:
+        v = os.getenv(k)
+        if v:
+            return v
+    return default
+
 DATABASES = {
     "default": {
-        "ENGINE": os.getenv("DB_ENGINE", "django.db.backends.postgresql"),
-        "NAME": os.getenv("DB_NAME", "shopapi"),
-        "USER": os.getenv("DB_USER", "shop"),
-        "PASSWORD": os.getenv("DB_PASSWORD", "secret"),
-        "HOST": os.getenv("DB_HOST", "db"),
-        "PORT": os.getenv("DB_PORT", "5432"),
-        "CONN_MAX_AGE": 600,
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": env_multi("DB_NAME", "POSTGRES_DB", default="shopapi"),
+        "USER": env_multi("DB_USER", "POSTGRES_USER", default="postgres"),
+        "PASSWORD": env_multi("DB_PASSWORD", "POSTGRES_PASSWORD", default=""),
+        "HOST": env_multi("DB_HOST", "POSTGRES_HOST", default="127.0.0.1"),
+        "PORT": env_multi("DB_PORT", "POSTGRES_PORT", default="5432"),
     }
 }
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Internationalization (ko/en)
 # ──────────────────────────────────────────────────────────────────────────────
