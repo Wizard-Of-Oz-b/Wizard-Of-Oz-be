@@ -215,5 +215,4 @@ class TossWebhookAPI(APIView):
             return Response({"detail": "invalid signature"}, status=status.HTTP_401_UNAUTHORIZED)
 
         event = json.loads(body.decode("utf-8"))
-        # TODO: event["eventType"] 별로 purchase 갱신 필요 시 구현
         return Response({"ok": True}, status=status.HTTP_200_OK)
