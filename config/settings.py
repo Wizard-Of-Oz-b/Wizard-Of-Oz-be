@@ -213,6 +213,9 @@ SOCIAL_OAUTH = {
     },
 }
 
+TOSS_CLIENT_KEY  = os.getenv("TOSS_CLIENT_KEY", "")
+TOSS_SECRET_KEY  = os.getenv("TOSS_SECRET_KEY", "")
+
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "domains.accounts.validators.PasswordComplexityValidator"},
     # (원하면 추가) {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
@@ -247,3 +250,4 @@ STORAGES = {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
 }
+

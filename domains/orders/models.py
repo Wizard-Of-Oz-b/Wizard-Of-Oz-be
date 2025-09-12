@@ -20,6 +20,10 @@ class Purchase(models.Model):
     amount = models.PositiveIntegerField()
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PAID)
     purchased_at = models.DateTimeField(auto_now_add=True)
+     # 결제사 / 트랜잭션 키 (운영 권장)
+    pg     = models.CharField(max_length=20,  blank=True, null=True, default=None)
+    pg_tid = models.CharField(max_length=100, blank=True, null=True, unique=True, default=None)  # 멱등성/중복 방지
+
 
     class Meta:
         db_table = "purchases"
