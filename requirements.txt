@@ -38,3 +38,4 @@ python-dotenv
 gunicorn
 uvicorn[standard]
 django-cors-headers==4.8.0
+whitenoise
