@@ -1,3 +1,4 @@
+# domains/orders/views.py
 import django_filters as df
 from django.db import transaction
 from rest_framework import generics, permissions
@@ -58,6 +59,27 @@ class PurchaseListCreateAPI(generics.ListCreateAPIView):
         serializer.save(user=self.request.user, status=Purchase.STATUS_PAID)
 
 
+# ---- POST 전용(분리된 엔드포인트 쓰고 싶을 때) ----
+class PurchaseCreateAPI(generics.CreateAPIView):
+    """
+    POST /api/v1/orders/   (또는 원하는 경로)
+    - 로그인 사용자만 허용
+    - 결제 성공으로 간주하여 purchase 생성
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = PurchaseWriteSerializer
+    # 스키마/검증용 안전 기본값
+    queryset = Purchase.objects.none()
+
+    @transaction.atomic
+    @extend_schema(operation_id="CreatePurchaseOnly", request=PurchaseWriteSerializer, responses={201: PurchaseReadSerializer})
+    def post(self, request, *args, **kwargs):
+        return super().post(request, *args, **kwargs)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user, status=Purchase.STATUS_PAID)
+
+
 # ---- 내 구매 목록 / 상세 ----
 class PurchaseMeListAPI(generics.ListAPIView):
     """GET /api/v1/purchases/me  (로그인 사용자의 본인 구매 목록)"""
@@ -74,7 +96,7 @@ class PurchaseMeListAPI(generics.ListAPIView):
             return Purchase.objects.none()
         # 성능/타입 안전을 위해 user_id로 필터 권장(= int)
         return (Purchase.objects
-                .filter(user_id=self.request.user.id)   # ← 기존 user=self.request.user 도 동작은 OK
+                .filter(user_id=self.request.user.id)
                 .order_by("-purchased_at"))
 
 
