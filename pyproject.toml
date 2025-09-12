@@ -10,17 +10,10 @@ dependencies = [
     "djangorestframework-simplejwt>=5.5.1",
     "drf-spectacular>=0.28.0",
     "psycopg[binary]>=3.2.10",
-    "pytest>=8.4.2",
     "python-dotenv>=1.1.1",
     "requests>=2.32.5",
-]
-
-[dependency-groups]
-dev = [
-    "pytest>=8.4.2",
-    "pytest-cov>=7.0.0",
-    "pytest-django>=4.11.1",
-    "pytest-xdist>=3.8.0",
+    # uv를 메인으로 쓴다면 여기에 추가해도 됨
+    # "django-cors-headers>=4.8.0",
 ]
 
 [dependency-groups]
