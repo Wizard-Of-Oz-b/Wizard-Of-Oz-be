@@ -24,4 +24,6 @@ urlpatterns = [
     # Staff/Admin
     path("admins/", include(("domains.staff.urls_admins", "staff_admins"))),        # /api/v1/admins/...
     path("admin-logs/", include(("domains.staff.urls_logs", "staff_logs"))),       # /api/v1/admin-logs/...
+
+    path("payments/toss/", include(("domains.payments.urls_toss", "payments_toss"))),
 ]
