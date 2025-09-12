@@ -4,17 +4,24 @@ from pathlib import Path
 from datetime import timedelta
 from dotenv import load_dotenv
 
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Base & Env
 # ──────────────────────────────────────────────────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent.parent
-load_dotenv(BASE_DIR / ".env")
 
+# 1) (선택) 컨테이너에서만 .env.docker 읽게 하거나, 아예 주석 처리
+# from dotenv import load_dotenv
+# load_dotenv(BASE_DIR / ".env.docker")  # compose의 env_file만 쓴다면 이 줄도 생략 가능
+
+# 2) 여기서 바로 환경변수 읽기
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-secret")
-DEBUG = os.getenv("DEBUG", "1") == "1"
+
+# "1/true/yes/on" 다 허용 (대소문자 무시)
+_DEBUG_RAW = os.getenv("DEBUG", "1")
+DEBUG = str(_DEBUG_RAW).strip().lower() in ("1", "true", "yes", "on")
 
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",")
-
 # ──────────────────────────────────────────────────────────────────────────────
 # Applications
 # ──────────────────────────────────────────────────────────────────────────────
@@ -85,18 +92,15 @@ ASGI_APPLICATION = "config.asgi.application"
 # ──────────────────────────────────────────────────────────────────────────────
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.getenv("POSTGRES_DB", "shopapi"),
-        "USER": os.getenv("POSTGRES_USER", "shop"),
-        "PASSWORD": os.getenv("POSTGRES_PASSWORD", "secret"),
-        "HOST": os.getenv("POSTGRES_HOST", "127.0.0.1"),
-        "PORT": os.getenv("POSTGRES_PORT", "5432"),
-        "CONN_MAX_AGE": 60,
-        "ATOMIC_REQUESTS": True,
-        "OPTIONS": {},
+        "ENGINE": os.getenv("DB_ENGINE", "django.db.backends.postgresql"),
+        "NAME": os.getenv("DB_NAME", "shopapi"),
+        "USER": os.getenv("DB_USER", "shop"),
+        "PASSWORD": os.getenv("DB_PASSWORD", "secret"),
+        "HOST": os.getenv("DB_HOST", "db"),
+        "PORT": os.getenv("DB_PORT", "5432"),
+        "CONN_MAX_AGE": 600,
     }
 }
-
 # ──────────────────────────────────────────────────────────────────────────────
 # Internationalization (ko/en)
 # ──────────────────────────────────────────────────────────────────────────────
@@ -168,15 +172,23 @@ CSRF_TRUSTED_ORIGINS = os.getenv(
     "http://localhost:3000,https://localhost:3000,http://127.0.0.1:3000",
 ).split(",")
 
-# (선택) CORS 사용 시
-# INSTALLED_APPS += ["corsheaders"]
-# MIDDLEWARE = ["corsheaders.middleware.CorsMiddleware"] + MIDDLEWARE
-# CORS_ALLOWED_ORIGINS = [
-#     "http://localhost:3000",
-#     "http://127.0.0.1:3000",
-# ]
+INSTALLED_APPS += ["corsheaders"]
+MIDDLEWARE = ["corsheaders.middleware.CorsMiddleware"] + MIDDLEWARE
 
-# config/settings.py (하단 아무 곳)
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+CORS_ALLOW_CREDENTIALS = True  # 쿠키/세션 사용할 가능성 대비
+
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_SAMESITE = "Lax"
+
 SOCIAL_OAUTH = {
     "google": {
         "client_id": os.getenv("GOOGLE_CLIENT_ID", ""),
