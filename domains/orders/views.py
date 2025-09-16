@@ -1,23 +1,37 @@
 # domains/orders/views.py
+from __future__ import annotations
+from drf_spectacular.utils import extend_schema
+from .serializers import PurchaseReadSerializer
 import django_filters as df
 from django.db import transaction
-from rest_framework import generics, permissions
-from rest_framework.response import Response
+from django.core.exceptions import ValidationError
+
+from rest_framework import generics, permissions, status
 from rest_framework.filters import OrderingFilter
+from rest_framework.response import Response
+from rest_framework.views import APIView
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema
 
 from domains.orders.models import Purchase
-from domains.orders.serializers import PurchaseReadSerializer, PurchaseWriteSerializer
+from .serializers import PurchaseReadSerializer, PurchaseWriteSerializer
 from shared.permissions import IsOwnerOrAdmin
 from shared.pagination import StandardResultsSetPagination
 
+from .services import (
+    checkout_user_cart,
+    cancel_purchase,
+    refund_purchase,
+)
 
-# ---- 공통 필터 (Admin 목록용) ----
+# -------------------------------
+# Filters (admin listing)
+# -------------------------------
 class PurchaseFilter(df.FilterSet):
     status = df.CharFilter()
-    user_id = df.NumberFilter(field_name="user_id")
-    product_id = df.NumberFilter(field_name="product_id")
+    # UUID 기반 필터
+    user_id = df.UUIDFilter(field_name="user_id")
+    product_id = df.UUIDFilter(field_name="product_id")
     date_from = df.IsoDateTimeFilter(field_name="purchased_at", lookup_expr="gte")
     date_to = df.IsoDateTimeFilter(field_name="purchased_at", lookup_expr="lte")
 
@@ -26,11 +40,13 @@ class PurchaseFilter(df.FilterSet):
         fields = ["status", "user_id", "product_id", "date_from", "date_to"]
 
 
-# ---- GET(Admin) / POST(Auth) 한 엔드포인트로 합치기 ----
+# -------------------------------
+# GET (admin list) / POST (create)
+# -------------------------------
 class PurchaseListCreateAPI(generics.ListCreateAPIView):
     """
     GET  /api/v1/purchases        (관리자만, 필터/정렬/페이징)
-    POST /api/v1/purchases        (로그인 필요, 결제성공으로 간주하여 구매 생성)
+    POST /api/v1/purchases        (로그인 필요, 결제 성공으로 간주하여 구매 생성)
     """
     queryset = Purchase.objects.all().order_by("-purchased_at")
     filter_backends = [DjangoFilterBackend, OrderingFilter]
@@ -39,8 +55,11 @@ class PurchaseListCreateAPI(generics.ListCreateAPIView):
     pagination_class = StandardResultsSetPagination
 
     def get_permissions(self):
-        # 목록은 관리자만, 생성은 로그인 사용자
-        return [permissions.IsAdminUser()] if self.request.method == "GET" else [permissions.IsAuthenticated()]
+        return (
+            [permissions.IsAdminUser()]
+            if self.request.method == "GET"
+            else [permissions.IsAuthenticated()]
+        )
 
     def get_serializer_class(self):
         return PurchaseWriteSerializer if self.request.method == "POST" else PurchaseReadSerializer
@@ -50,29 +69,32 @@ class PurchaseListCreateAPI(generics.ListCreateAPIView):
         return super().get(*args, **kwargs)
 
     @transaction.atomic
-    @extend_schema(operation_id="CreatePurchase", request=PurchaseWriteSerializer, responses={201: PurchaseReadSerializer})
+    @extend_schema(
+        operation_id="CreatePurchase",
+        request=PurchaseWriteSerializer,
+        responses={201: PurchaseReadSerializer},
+    )
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)
 
-    # user/status를 확실히 세팅
     def perform_create(self, serializer):
         serializer.save(user=self.request.user, status=Purchase.STATUS_PAID)
 
 
-# ---- POST 전용(분리된 엔드포인트 쓰고 싶을 때) ----
+# -------------------------------
+# POST-only create (separate endpoint)
+# -------------------------------
 class PurchaseCreateAPI(generics.CreateAPIView):
-    """
-    POST /api/v1/orders/   (또는 원하는 경로)
-    - 로그인 사용자만 허용
-    - 결제 성공으로 간주하여 purchase 생성
-    """
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = PurchaseWriteSerializer
-    # 스키마/검증용 안전 기본값
     queryset = Purchase.objects.none()
 
     @transaction.atomic
-    @extend_schema(operation_id="CreatePurchaseOnly", request=PurchaseWriteSerializer, responses={201: PurchaseReadSerializer})
+    @extend_schema(
+        operation_id="CreatePurchaseOnly",
+        request=PurchaseWriteSerializer,
+        responses={201: PurchaseReadSerializer},
+    )
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)
 
@@ -80,37 +102,36 @@ class PurchaseCreateAPI(generics.CreateAPIView):
         serializer.save(user=self.request.user, status=Purchase.STATUS_PAID)
 
 
-# ---- 내 구매 목록 / 상세 ----
+# -------------------------------
+# My purchases (list)
+# -------------------------------
 class PurchaseMeListAPI(generics.ListAPIView):
-    """GET /api/v1/purchases/me  (로그인 사용자의 본인 구매 목록)"""
+    """GET /api/v1/purchases/me"""
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = PurchaseReadSerializer
     pagination_class = StandardResultsSetPagination
-
-    # ✅ 스키마 생성 시 모델 추론용 안전 기본값
-    queryset = Purchase.objects.none()
+    queryset = Purchase.objects.none()  # schema-safe
 
     def get_queryset(self):
-        # ✅ 스키마 생성 중이거나 비인증이면 빈 쿼리셋
         if getattr(self, "swagger_fake_view", False) or not self.request.user.is_authenticated:
             return Purchase.objects.none()
-        # 성능/타입 안전을 위해 user_id로 필터 권장(= int)
-        return (Purchase.objects
-                .filter(user_id=self.request.user.id)
-                .order_by("-purchased_at"))
+        return Purchase.objects.filter(user_id=self.request.user.id).order_by("-purchased_at")
 
 
+# -------------------------------
+# Detail
+# -------------------------------
 class PurchaseDetailAPI(generics.RetrieveAPIView):
-    """
-    GET /api/v1/purchases/{purchase_id}  (소유자 또는 관리자)
-    """
+    """GET /api/v1/purchases/{purchase_id}"""
     lookup_url_kwarg = "purchase_id"
     queryset = Purchase.objects.all()
     permission_classes = [IsOwnerOrAdmin]
     serializer_class = PurchaseReadSerializer
 
 
-# ---- 상태 전이 ----
+# -------------------------------
+# Status transitions (with stock restore)
+# -------------------------------
 class PurchaseCancelAPI(generics.UpdateAPIView):
     """
     PATCH /api/v1/purchases/{purchase_id}/cancel  (소유자/관리자, paid -> canceled)
@@ -126,8 +147,7 @@ class PurchaseCancelAPI(generics.UpdateAPIView):
         obj = self.get_object()
         if obj.status != Purchase.STATUS_PAID:
             return Response({"detail": "only paid can be canceled"}, status=409)
-        obj.status = Purchase.STATUS_CANCELED
-        obj.save(update_fields=["status"])
+        obj = cancel_purchase(obj)  # 재고 복원 포함
         return Response(PurchaseReadSerializer(obj).data)
 
 
@@ -137,15 +157,38 @@ class PurchaseRefundAPI(generics.UpdateAPIView):
     """
     lookup_url_kwarg = "purchase_id"
     queryset = Purchase.objects.all()
-    permission_classes = [permissions.IsAdminUser]  # 관리자/CS만
+    permission_classes = [permissions.IsAdminUser]
     serializer_class = PurchaseReadSerializer
-    http_method_names = ["get", "patch", "delete", "options", "head"]
+    http_method_names = ["patch", "options", "head"]
 
     @transaction.atomic
     def patch(self, request, *args, **kwargs):
         obj = self.get_object()
         if obj.status == Purchase.STATUS_REFUNDED:
             return Response({"detail": "already refunded"}, status=409)
-        obj.status = Purchase.STATUS_REFUNDED
-        obj.save(update_fields=["status"])
+        obj = refund_purchase(obj)  # 재고 복원 포함
         return Response(PurchaseReadSerializer(obj).data)
+
+
+# -------------------------------
+# Checkout (Cart -> Purchases)
+# -------------------------------
+class CheckoutView(APIView):
+    """
+    POST /api/v1/orders/checkout/
+    - 로그인 사용자의 장바구니를 주문으로 전환
+    - 재고 부족/미등록 옵션 시 409 반환
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = PurchaseReadSerializer
+    queryset = Purchase.objects.none()
+
+    @extend_schema(
+        operation_id="Checkout",
+        responses={201: PurchaseReadSerializer(many=True)},
+        tags=["Orders"],
+    )
+
+    def post(self, request):
+        purchases = checkout_user_cart(request.user)
+        return Response(PurchaseReadSerializer(purchases, many=True).data, status=201)

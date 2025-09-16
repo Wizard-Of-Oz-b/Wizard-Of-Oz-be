@@ -17,7 +17,10 @@ from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema
 from django.contrib.auth import get_user_model
 from .serializers import MeSerializer, MeUpdateSerializer, SocialAccountSerializer
-
+from rest_framework import generics, permissions
+from drf_spectacular.utils import extend_schema
+from .models import SocialAccount
+from .serializers import SocialAccountSerializer
 User = get_user_model()
 
 
@@ -138,6 +141,7 @@ class MySocialAccountListAPI(generics.ListAPIView):
     """
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = SocialAccountSerializer
+    queryset = SocialAccount.objects.none()
 
     def get_queryset(self):
         return SocialAccount.objects.filter(user=self.request.user).order_by("provider", "created_at")

@@ -17,6 +17,10 @@ from domains.payments.serializers_toss import (
     TossConfirmRequestSerializer,
     TossCancelRequestSerializer,
 )
+from rest_framework.views import APIView
+from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
+from drf_spectacular.utils import extend_schema, OpenApiTypes
 
 TOSS_SECRET_KEY = getattr(settings, "TOSS_SECRET_KEY", "")
 TOSS_CLIENT_KEY = getattr(settings, "TOSS_CLIENT_KEY", "")
@@ -57,6 +61,15 @@ def _assign_and_save_purchase(purchase, *, status_value, pg_value=None, pg_tid_v
 class TossClientKeyAPI(APIView):
     permission_classes = [permissions.AllowAny]
 
+    @extend_schema(
+        operation_id="GetTossClientKey",
+        responses={200: {
+            "type": "object",
+            "properties": {"clientKey": {"type": "string"}},
+            "required": ["clientKey"],
+        }},
+        tags=["Payments"],
+    )
     def get(self, request):
         return Response({"clientKey": TOSS_CLIENT_KEY})
 
@@ -203,6 +216,21 @@ class TossWebhookAPI(APIView):
     헤더 'Toss-Signature' 검증(HMAC-SHA256 with secretKey)
     """
     permission_classes = [permissions.AllowAny]
+
+    @extend_schema(
+        operation_id="TossWebhook",
+        request={"application/json": {
+            "type": "object",
+            "properties": {
+                "orderId": {"type": "string"},
+                "paymentKey": {"type": "string"},
+                "status": {"type": "string"},
+            },
+            "required": ["orderId", "paymentKey", "status"],
+        }},
+        responses={200: OpenApiTypes.OBJECT},  # 혹은 {204: None}
+        tags=["Payments"],
+    )
 
     def post(self, request):
         body = request.body  # bytes

@@ -1,113 +1,70 @@
+# domains/catalog/serializers.py
+from __future__ import annotations
+
 from rest_framework import serializers
-from .models import Category, Product
+from .models import Category,ProductStock, Product
+
+
 
 
 # =========================
-# Categories
+# Categories (UUID / no parent)
 # =========================
 class CategorySerializer(serializers.ModelSerializer):
-    # 읽기용: parent_id 그대로 노출 (source 지정 X)
-    parent_id = serializers.IntegerField(read_only=True)
+    # API에서 컬럼명을 category_id로 노출
+    category_id = serializers.UUIDField(source="id", read_only=True)
 
     class Meta:
         model = Category
-        fields = ["category_id", "name", "parent_id"]
+        fields = ("category_id", "name")  # created_at/updated_at 있으면 추가
 
 
 class CategoryWriteSerializer(serializers.ModelSerializer):
-    # 쓰기용: 숫자 parent_id로 입력받기 (선택값)
-    parent_id = serializers.IntegerField(required=False, allow_null=True)
-
     class Meta:
         model = Category
-        # model 필드는 name/parent 이지만, 입력은 parent_id 로 받음
-        fields = ["name", "parent_id"]
-
-    def validate_parent_id(self, value):
-        if value is None:
-            return value
-        if not Category.objects.filter(pk=value).exists():
-            raise serializers.ValidationError("parent category not found")
-
-        # 사이클 방지(자기 자신/자손을 부모로 지정 금지)
-        inst = getattr(self, "instance", None)
-        if inst is not None:
-            pid = value
-            while pid:
-                if pid == inst.pk:
-                    raise serializers.ValidationError("cannot set parent to its descendant/self")
-                pid = Category.objects.filter(pk=pid).values_list("parent_id", flat=True).first()
-        return value
-
-    def create(self, validated_data):
-        # parent_id -> model.parent_id 로 명시적 매핑
-        parent_id = validated_data.pop("parent_id", None)
-        obj = Category(name=validated_data.get("name", ""), parent_id=parent_id)
-        obj.save()
-        return obj
-
-    def update(self, instance, validated_data):
-        # 부분 수정 지원
-        if "name" in validated_data:
-            instance.name = validated_data["name"]
-        if "parent_id" in validated_data:
-            instance.parent_id = validated_data["parent_id"]
-        instance.save()
-        return instance
-
-
-class CategoryNodeSerializer(serializers.ModelSerializer):
-    # 트리 응답용 (children 재귀)
-    parent_id = serializers.IntegerField(read_only=True)
-    children = serializers.SerializerMethodField()
-
-    class Meta:
-        model = Category
-        fields = ["category_id", "name", "parent_id", "children"]
-
-    def get_children(self, obj):
-        qs = obj.children.all().order_by("name")
-        return CategoryNodeSerializer(qs, many=True).data
+        fields = ("name",)
 
 
 # =========================
-# Products
+# Products (UUID, FK -> Category)
 # =========================
-class ProductSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Product
-        fields = ["product_id", "name", "description", "price", "category", "is_active", "created_at"]
-
-
 class ProductReadSerializer(serializers.ModelSerializer):
-    # 외부로는 category_id 숫자로 노출 (source 지정 X)
-    category_id = serializers.IntegerField(read_only=True)
+    product_id = serializers.UUIDField(source="id", read_only=True)
+
+    # Django는 FK에 대해 <field>_id 속성을 자동으로 제공합니다.
+    # source 지정 없이 read_only로 두면 모델의 category_id 값을 그대로 읽습니다.
+    category_id = serializers.UUIDField(read_only=True)
     category_name = serializers.CharField(source="category.name", read_only=True)
-    # 옵션은 없으면 []로 내려줌
-    options = serializers.SerializerMethodField()
+
+    price = serializers.DecimalField(max_digits=12, decimal_places=2)
+    options = serializers.JSONField(required=False)
 
     class Meta:
         model = Product
-        fields = [
-            "product_id", "name", "description", "price",
-            "category_id", "category_name", "is_active", "created_at", "options",
-        ]
-
-    def get_options(self, obj):
-        return obj.options or []
+        fields = (
+            "product_id",
+            "name",
+            "description",
+            "price",
+            "is_active",
+            "options",
+            "category_id",    # 읽기 전용 FK id
+            "category_name",  # 읽기 전용 FK name
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = ("product_id", "category_id", "category_name", "created_at", "updated_at")
 
 
 class ProductWriteSerializer(serializers.ModelSerializer):
-    # 입력은 category_id 숫자로 받음(선택)
-    category_id = serializers.IntegerField(required=False, allow_null=True)
-    price = serializers.IntegerField(min_value=0)
-    # 옵션은 선택값 (없으면 [])
-    options = serializers.JSONField(required=False, default=list)
+    # 입력은 category_id로 받되, 내부에서 model.category_id에 매핑
+    category_id = serializers.UUIDField(required=False, allow_null=True)
+    price = serializers.DecimalField(max_digits=12, decimal_places=2)
+    options = serializers.JSONField(required=False)
 
     class Meta:
         model = Product
-        # model 필드엔 category가 있지만, 입력은 category_id로 받는다
-        fields = ["name", "description", "price", "category_id", "is_active", "options"]
+        fields = ("name", "description", "price", "is_active", "options", "category_id")
 
     def validate_category_id(self, value):
         if value is None:
@@ -117,26 +74,53 @@ class ProductWriteSerializer(serializers.ModelSerializer):
         return value
 
     def create(self, validated_data):
-        # category_id 매핑
-        category_id = validated_data.pop("category_id", None)
-        obj = Product(**validated_data)  # options 포함해 자동 반영
-        obj.category_id = category_id
+        cid = validated_data.pop("category_id", None)
+        obj = Product(**validated_data)
+        obj.category_id = cid
         obj.save()
         return obj
 
     def update(self, instance, validated_data):
-        # 부분 수정 + category_id/옵션 반영
-        if "name" in validated_data:
-            instance.name = validated_data["name"]
-        if "description" in validated_data:
-            instance.description = validated_data["description"]
-        if "price" in validated_data:
-            instance.price = validated_data["price"]
-        if "is_active" in validated_data:
-            instance.is_active = validated_data["is_active"]
+        # 부분 업데이트
+        for f in ("name", "description", "price", "is_active", "options"):
+            if f in validated_data:
+                setattr(instance, f, validated_data[f])
         if "category_id" in validated_data:
             instance.category_id = validated_data["category_id"]
-        if "options" in validated_data:
-            instance.options = validated_data["options"]
         instance.save()
         return instance
+
+
+
+class ProductStockReadSerializer(serializers.ModelSerializer):
+    stock_id = serializers.UUIDField(source="id", read_only=True)
+    product_id = serializers.UUIDField( read_only=True)
+
+    class Meta:
+        model = ProductStock
+        fields = ("stock_id", "product_id", "option_key", "options",
+                  "stock_quantity", "created_at", "updated_at")
+
+class ProductStockWriteSerializer(serializers.ModelSerializer):
+    product_id = serializers.UUIDField()  # 입력은 product_id로 받기
+
+    class Meta:
+        model = ProductStock
+        fields = ("product_id", "option_key", "options", "stock_quantity")
+
+    def validate_product_id(self, v):
+        if not Product.objects.filter(pk=v).exists():
+            raise serializers.ValidationError("product not found")
+        return v
+
+    def create(self, validated):
+        pid = validated.pop("product_id")
+        return ProductStock.objects.create(product_id=pid, **validated)
+
+    def update(self, inst, validated):
+        # 필요 시 수정 허용 필드만 제한
+        for f in ("option_key", "options", "stock_quantity"):
+            if f in validated:
+                setattr(inst, f, validated[f])
+        inst.save()
+        return inst

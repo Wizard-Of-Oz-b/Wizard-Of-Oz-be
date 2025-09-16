@@ -6,8 +6,15 @@ from django.contrib.auth import get_user_model
 from .models import SocialAccount
 from rest_framework import serializers
 from .models import User
+
 User = get_user_model()
 
+class UserRoleUpdateSerializer(serializers.ModelSerializer):
+    role = serializers.ChoiceField(choices=User.Role.choices)
+
+    class Meta:
+        model = User
+        fields = ["role"]
 
 class EmptySerializer(serializers.Serializer):
     """본문이 없는 요청/응답에 쓰는 더미"""

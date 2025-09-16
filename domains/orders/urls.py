@@ -6,6 +6,7 @@ from .views import (
     PurchaseDetailAPI,
     PurchaseCancelAPI,
     PurchaseRefundAPI,
+    CheckoutView,
     # PurchaseCreateAPI,  # ← 별도 POST 전용 엔드포인트가 필요하면 주석 해제하고 아래에 추가하세요.
 )
 
@@ -26,6 +27,8 @@ urlpatterns = [
 
     # PATCH (admin): /api/v1/orders/<purchase_id>/refund/
     path("<int:purchase_id>/refund/", PurchaseRefundAPI.as_view(), name="refund"),
+
+    path("checkout/", CheckoutView.as_view(), name="orders-checkout"),
 ]
 
 # 필요 시 별도 POST 전용 경로

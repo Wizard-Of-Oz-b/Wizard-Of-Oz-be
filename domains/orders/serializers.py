@@ -1,26 +1,32 @@
+# domains/orders/serializers.py
+from __future__ import annotations
 from rest_framework import serializers
-from domains.orders.models import Purchase
-from domains.catalog.models import Product
+from .models import Purchase
 
 class PurchaseReadSerializer(serializers.ModelSerializer):
-    user_id = serializers.IntegerField(read_only=True)
-    product_id = serializers.IntegerField(read_only=True)
+    product_name = serializers.CharField(source="product.name", read_only=True)
 
     class Meta:
         model = Purchase
-        fields = ["purchase_id", "user_id", "product_id", "amount", "status", "purchased_at"]
+        fields = (
+            "purchase_id", "user", "product", "product_name",
+            "amount", "unit_price", "options", "option_key",
+            "status", "purchased_at", "pg", "pg_tid",
+        )
+        read_only_fields = ("purchase_id", "status", "purchased_at", "product_name")
 
 class PurchaseWriteSerializer(serializers.ModelSerializer):
-    product_id = serializers.IntegerField()
-    amount = serializers.IntegerField(min_value=1)
-
     class Meta:
         model = Purchase
-        fields = ["product_id", "amount"]
+        fields = (
+            "user", "product", "amount", "unit_price",
+            "options", "option_key", "pg", "pg_tid",
+        )
 
-    def validate_product_id(self, value):
-        # 유효 상품 여부 체크(원하면 is_active 조건 제거/변경)
-        if not Product.objects.filter(pk=value).exists():
-            raise serializers.ValidationError("product not found")
-        return value
-    # ⛔ create()는 정의하지 않습니다. (user/status는 view에서 넣음)
+    def validate_amount(self, v):
+        if v < 1:
+            raise serializers.ValidationError("amount must be >= 1")
+        return v
+
+# 호환용 별칭 (기존 코드에서 PurchaseSerializer를 임포트해도 동작)
+PurchaseSerializer = PurchaseReadSerializer
