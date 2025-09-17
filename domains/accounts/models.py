@@ -45,7 +45,11 @@ class User(AbstractUser):
         editable=False,
         db_column="user_id",
     )
+
+    # AbstractUser 기본 필드:
+    # username(Unique), first_name, last_name, email, is_staff, is_active, is_superuser 등
     email = models.EmailField(max_length=254, unique=True)
+
     nickname = models.CharField(max_length=150, blank=True)
     phone_number = models.CharField(max_length=50, blank=True)
     address = models.TextField(blank=True)
@@ -77,7 +81,7 @@ class User(AbstractUser):
             ),
         ]
 
-    # ---- 편의 프로퍼티(선택) ----
+    # ---- 편의 프로퍼티 ----
     @property
     def is_admin_role(self) -> bool:
         return self.role == UserRole.ADMIN
@@ -91,6 +95,7 @@ class User(AbstractUser):
         return self.role == UserRole.CS
 
     def __str__(self) -> str:
+        # email 우선, 없으면 username
         return self.email or self.username
 
     # ---- 역할 ↔ 장고 관리자 플래그 동기화 ----
@@ -99,7 +104,7 @@ class User(AbstractUser):
         - superuser 는 항상 is_staff=True (장고 규약)
         - role == admin 이면 is_staff=True
         - manager/cs/user 는 is_staff=False
-          (※ manager도 장고 어드민 접속 허용하려면 아래 or 절에 추가)
+          (※ manager도 장고 어드민 접속 허용하려면 or 조건에 MANAGER 추가)
         """
         should_staff = self.is_superuser or self.role == UserRole.ADMIN
         if self.is_staff != should_staff:
@@ -149,4 +154,5 @@ class SocialAccount(models.Model):
         ]
 
     def __str__(self) -> str:
+        # FK의 raw id 접근은 <fieldname>_id 로 가능 (여기선 user_id)
         return f"{self.provider}:{self.provider_uid} -> {self.user_id}"

@@ -3,6 +3,8 @@ from django.urls import path, include
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
+
+
 urlpatterns = [
     # Auth
     path("auth/", include(("domains.accounts.urls_auth", "accounts_auth"))),
@@ -11,7 +13,6 @@ urlpatterns = [
 
     # Users
     path("users/", include(("domains.accounts.urls_users", "accounts_users"))),
-
     # Catalog
     path("categories/", include(("domains.catalog.urls_categories", "catalog_categories"))),
     path("products/", include(("domains.catalog.urls_products", "catalog_products"))),
@@ -30,6 +31,8 @@ urlpatterns = [
     path("carts/", include("domains.carts.urls")),
     path("schema/", SpectacularAPIView.as_view(), name="schema"),
     path("docs/",   SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
+
+    path("admin/", include("domains.staff.urls_admin")),
 
 
 ]
