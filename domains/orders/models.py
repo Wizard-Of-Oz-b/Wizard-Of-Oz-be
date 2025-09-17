@@ -7,6 +7,10 @@ from domains.catalog.models import Product
 
 User = get_user_model()
 
+class PurchaseStatus(models.TextChoices):
+    PAID = "paid", "Paid"
+    CANCELED = "canceled", "Canceled"
+    REFUNDED = "refunded", "Refunded"
 
 class Purchase(models.Model):
     # --- 상태 Enum ---
@@ -50,7 +54,9 @@ class Purchase(models.Model):
     )
 
     status = models.CharField(
-        max_length=20, choices=STATUS_CHOICES, default=STATUS_PAID
+        max_length=20,
+        choices=PurchaseStatus.choices,
+        default=PurchaseStatus.PAID,
     )
     purchased_at = models.DateTimeField(auto_now_add=True)
 

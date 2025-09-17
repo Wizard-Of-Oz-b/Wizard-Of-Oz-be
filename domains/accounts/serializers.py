@@ -1,20 +1,32 @@
+# domains/accounts/serializers.py
 from django.contrib.auth.base_user import BaseUserManager
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.hashers import check_password
-from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from .models import SocialAccount
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
-from .models import User
+
+from .models import SocialAccount
 
 User = get_user_model()
 
+
+# ------------------------
+# 공용/관리용 Serializer
+# ------------------------
 class UserRoleUpdateSerializer(serializers.ModelSerializer):
-    role = serializers.ChoiceField(choices=User.Role.choices)
+    role = serializers.ChoiceField(choices=[c[0] for c in User.Role.choices])
 
     class Meta:
         model = User
         fields = ["role"]
+
+    def validate_role(self, value):
+        valid = [c[0] for c in User.Role.choices]
+        if value not in valid:
+            raise serializers.ValidationError(f"허용되지 않는 역할입니다: {value}")
+        return value
+
 
 class EmptySerializer(serializers.Serializer):
     """본문이 없는 요청/응답에 쓰는 더미"""
@@ -30,7 +42,7 @@ class TokenResponseSerializer(serializers.Serializer):
     access = serializers.CharField()
 
 
-# ✅ access + refresh 동시 응답용 (스키마 문서화)
+# access + refresh 동시 응답용 (스키마 문서화)
 class TokenPairResponseSerializer(serializers.Serializer):
     access = serializers.CharField()
     refresh = serializers.CharField()
@@ -42,14 +54,17 @@ def normalize_email(value: str) -> str:
     return v.lower()
 
 
+# ------------------------
+# 회원가입 / 로그인
+# ------------------------
 class RegisterSerializer(serializers.ModelSerializer):
-    # 길이도 8~16으로 UI/스키마 레벨 맞춰줌
+    # 길이도 8~16으로 UI/스키마 레벨 맞춤
     password = serializers.CharField(write_only=True, min_length=8, max_length=16)
 
     class Meta:
         model = User
+        # 현재 User 모델에 있다고 확신되는 필드만 명시
         fields = ("email", "password", "nickname", "phone_number", "address")
-
 
     def validate(self, data):
         # 전역 비밀번호 검증기(복잡도 포함) 실행
@@ -63,7 +78,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 
         user = User(
             email=email,
-            username=email,  # ✅ 핵심: username을 반드시 채움(UNIQUE 충돌 방지)
+            username=email,  # UNIQUE 충돌 방지: username을 이메일로 세팅
             nickname=validated.get("nickname", ""),
             phone_number=validated.get("phone_number", ""),
             address=validated.get("address", ""),
@@ -71,6 +86,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         user.set_password(password)
         user.save(using=self.context.get("using") or "default")
         return user
+
 
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
@@ -92,19 +108,50 @@ class LoginSerializer(serializers.Serializer):
         return data
 
 
+# ------------------------
+# /users/me (조회/수정)
+# ------------------------
 class MeSerializer(serializers.ModelSerializer):
-    # first_name 을 name 으로 노출
-    name = serializers.CharField(source="first_name", read_only=True)
+    """내 정보 조회용 (GET /users/me) — 안전한 필드만 노출"""
+    user_id = serializers.UUIDField(source="id", read_only=True)
+    role = serializers.CharField(read_only=True)
+    # User 모델에 'name' 필드가 없을 수 있어 계산 필드로 제공
+    name = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ("email", "name", "nickname", "phone_number", "address",
-                  "status", "created_at", "updated_at")
-        read_only_fields = ("email", "status", "created_at", "updated_at")
+        # 존재하는 필드 + 계산/매핑 필드만 나열
+        fields = [
+            "user_id",
+            "email",
+            "username",
+            "name",          # first_name 기반 계산 필드
+            "nickname",
+            "phone_number",
+            "address",
+            "status",
+            "is_active",
+            "role",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = fields
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_name(self, obj):
+        # 선호: user.first_name → (없으면 None)
+        fn = getattr(obj, "first_name", None)
+        ln = getattr(obj, "last_name", None)
+        if fn and ln:
+            return f"{fn} {ln}"
+        return fn or None
 
-# 수정용
+
 class MeUpdateSerializer(serializers.ModelSerializer):
-    # 쓰기 허용 필드
+    """
+    내 정보 수정용 (PATCH /users/me)
+    - name -> first_name 로 매핑
+    - 비밀번호 변경(current/new) 옵션
+    """
     name = serializers.CharField(source="first_name", required=False, allow_blank=True, max_length=150)
     nickname = serializers.CharField(required=False, allow_blank=True, max_length=150)
     phone_number = serializers.CharField(required=False, allow_blank=True, max_length=50)
@@ -121,22 +168,24 @@ class MeUpdateSerializer(serializers.ModelSerializer):
     def validate(self, data):
         cur = data.get("current_password")
         new = data.get("new_password")
+        # 둘 중 하나만 오면 오류
         if (cur is None) ^ (new is None):
             raise serializers.ValidationError({"new_password": "current_password와 new_password는 함께 보내야 합니다."})
+
         if new:
             user = self.instance or self.context.get("request").user
             if not check_password(cur or "", user.password):
                 raise serializers.ValidationError({"current_password": "현재 비밀번호가 올바르지 않습니다."})
-            validate_password(new, user=user)  # 우리의 커스텀 복잡도 검증기도 함께 적용됨
+            validate_password(new, user=user)
         return data
 
     def update(self, instance, validated):
-        # 일반 필드
+        # 일반 필드 반영 (name은 first_name으로 들어옴)
         for f in ("first_name", "nickname", "phone_number", "address"):
             if f in validated:
                 setattr(instance, f, validated[f])
 
-        # 비밀번호
+        # 비밀번호 변경
         new = validated.get("new_password")
         if new:
             instance.set_password(new)
@@ -144,15 +193,12 @@ class MeUpdateSerializer(serializers.ModelSerializer):
         instance.save()
         return instance
 
+
+# ------------------------
+# 소셜 계정
+# ------------------------
 class SocialAccountSerializer(serializers.ModelSerializer):
     class Meta:
         model = SocialAccount
         fields = ("id", "provider", "provider_uid", "email", "created_at")
         read_only_fields = fields
-
-class UserMeSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = User
-        # 노출하고 싶은 필드만 (예시)
-        fields = ["id", "email", "username", "nickname", "avatar_url", "created_at", "updated_at"]
-        read_only_fields = ["id", "email", "created_at", "updated_at"]

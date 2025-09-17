@@ -148,25 +148,35 @@ REST_FRAMEWORK = {
     "DEFAULT_FILTER_BACKENDS": ("django_filters.rest_framework.DjangoFilterBackend",),
 }
 
+
 SPECTACULAR_SETTINGS = {
     "TITLE": "Fashion Shop API",
+    "DESCRIPTION": "Shop / Admin endpoints with JWT (Bearer).",
     "VERSION": "1.0.0",
-    "SERVE_INCLUDE_SCHEMA": False,      # /schema/는 숨기고 /docs/만 노출
-    "SCHEMA_PATH_PREFIX": r"/api/v1",   # 문서에 포함할 경로 prefix (네 API 프리픽스에 맞춰 수정)
-    "COMPONENT_SPLIT_REQUEST": True,    # Read/Write serializer 분리 표시
-    "SECURITY": [{"BearerAuth": []}],   # 상단 Authorize 버튼에 JWT 추가
+    "SCHEMA_PATH_PREFIX": r"/api/v1",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "COMPONENT_SPLIT_REQUEST": True,
+    "SECURITY": [{"BearerAuth": []}],
     "COMPONENTS": {
         "securitySchemes": {
-            "BearerAuth": {
-                "type": "http",
-                "scheme": "bearer",
-                "bearerFormat": "JWT",
-            }
+            "BearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"},
         }
     },
-    # (선택) 로컬/프록시 환경이면 서버 표시를 명시하고 싶을 때
-    # "SERVERS": [{"url": "/"}],
+    # ✅ 필드 경로만 사용 (클래스 경로 전부 삭제!)
+    "DISABLE_ERRORS_AND_WARNINGS": True,
+
+    "SWAGGER_UI_SETTINGS": {
+        "deepLinking": True,
+        "displayRequestDuration": True,
+        "persistAuthorization": True,
+    },
+    "SERVERS": [{"url": "/"}],
 }
+
+
+
+
+
 
 REST_FRAMEWORK.update({
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
