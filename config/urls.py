@@ -1,4 +1,6 @@
 # config/urls.py
+from django.conf import settings
+from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import path, include
 from django.views.generic import RedirectView
@@ -33,7 +35,7 @@ urlpatterns = [
     path("api/v1/auth/social/<str:provider>/login", SocialLoginView.as_view(), name="social-login"),
     path("api/v1/auth/social/<str:provider>/unlink", SocialUnlinkView.as_view(), name="social-unlink"),
 
-]
+]  + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 def healthz(_): return JsonResponse({"ok": True})
 urlpatterns += [path("healthz/", healthz)]

@@ -3,29 +3,43 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
 
-from rest_framework import viewsets, permissions, filters
+from rest_framework import viewsets, permissions, filters, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.decorators import action
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
 from drf_spectacular.utils import extend_schema, OpenApiExample
 from django_filters.rest_framework import DjangoFilterBackend
 import django_filters as df
 
+# URL 다운로드(저장 모드)용
+import os, uuid, mimetypes
+from urllib.parse import urlparse
+from urllib.request import urlopen, Request
+from django.core.files.base import ContentFile
+
 from domains.accounts.serializers import EmptySerializer
 from domains.staff.permissions import IsAdminRole, IsAdminOrManager
 from domains.staff.serializers import (
+    # Users
     UserMinSerializer, UserRoleUpdateSerializer,
+    # Catalog
     CategoryAdminSerializer, ProductAdminSerializer, ProductStockAdminSerializer,
+    ProductImageAdminSerializer, ProductImagesUploadSerializer,
+    # Orders
     PurchaseAdminSerializer, OrderActionResponseSerializer,
 )
 
-from domains.catalog.models import Category, Product, ProductStock
+from domains.catalog.models import Category, Product, ProductStock, ProductImage
 from domains.orders.models import Purchase
 
 User = get_user_model()
 
 
-# ---------- Users (ADMIN) ----------
+# ---------------------------------------------------------
+# Users (ADMIN)
+# ---------------------------------------------------------
 @extend_schema(tags=["Admin • Users"])
 class AdminUserViewSet(viewsets.ReadOnlyModelViewSet):
     """
@@ -71,7 +85,9 @@ class AdminUserRoleAPI(APIView):
         return Response({"role": target.role}, status=200)
 
 
-# ---------- Categories (ADMIN·MANAGER) ----------
+# ---------------------------------------------------------
+# Categories (ADMIN·MANAGER)
+# ---------------------------------------------------------
 class CategoryFilter(df.FilterSet):
     name = df.CharFilter(field_name="name", lookup_expr="icontains")
     level = df.CharFilter(field_name="level")
@@ -104,11 +120,14 @@ class AdminCategoryViewSet(viewsets.ModelViewSet):
         return super().destroy(request, *args, **kwargs)
 
 
-# ---------- Products (ADMIN·MANAGER) ----------
+# ---------------------------------------------------------
+# Products (ADMIN·MANAGER)
+# ---------------------------------------------------------
 @extend_schema(tags=["Admin • Products"])
 class AdminProductViewSet(viewsets.ModelViewSet):
     """
     /api/v1/admin/products/
+    + /api/v1/admin/products/{id}/images/  (GET 목록, POST 업로드)
     """
     queryset = Product.objects.all().select_related("category").order_by("-created_at")
     serializer_class = ProductAdminSerializer
@@ -116,9 +135,125 @@ class AdminProductViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["name"]
     ordering_fields = ["created_at", "price", "name"]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]  # 파일/JSON 모두 허용
+
+    @extend_schema(
+        tags=["Admin • Products"],
+        summary="상품 이미지 업로드/목록 (파일, URL 저장, 또는 URL 참조)",
+        request=ProductImagesUploadSerializer,
+        responses={200: ProductImageAdminSerializer(many=True)},
+        operation_id="AdminProductImages",
+    )
+    @action(
+        detail=True,
+        methods=["get", "post"],                  # GET/POST 하나로 통합
+        url_path="images",
+        parser_classes=[MultiPartParser, FormParser, JSONParser],
+    )
+    def images(self, request, pk=None):
+        product = get_object_or_404(Product, pk=pk)
+
+        # ---- 목록 (GET) ----
+        if request.method == "GET":
+            qs = product.images.order_by("display_order", "created_at")
+            ser = ProductImageAdminSerializer(qs, many=True, context={"request": request})
+            return Response(ser.data, status=200)
+
+        # ---- 업로드 (POST) ----
+        in_ser = ProductImagesUploadSerializer(data=request.data)
+        in_ser.is_valid(raise_exception=True)
+        data = in_ser.validated_data
+
+        # form-data 파일
+        files = list(request.FILES.getlist("images") or [])
+        # URL 배열 (form-data/JSON 모두 대응)
+        url_list = data.get("image_urls") or []
+
+        # 모드: True면 원격 URL만 참조 저장, False면 URL 다운로드하여 파일 저장
+        save_remote = data.get("save_remote", False)
+
+        main_index   = data.get("main_index", -1)
+        start_order  = data.get("start_order", 0)
+        replace_main = data.get("replace_main", False)
+        alt_texts = data.get("alt_texts") or []
+        captions  = data.get("captions")  or []
+
+        # 기존 대표 제거
+        if replace_main:
+            product.images.filter(is_main=True).update(is_main=False)
+
+        created = []
+        url_errors = []
+
+        # 1) URL만 참조 (다운로드 X)
+        if save_remote and url_list:
+            for i, url in enumerate(url_list):
+                try:
+                    img = ProductImage.objects.create(
+                        product=product,
+                        remote_url=url,
+                        is_remote=True,
+                        alt_text=(alt_texts[i] if i < len(alt_texts) else ""),
+                        caption=(captions[i]  if i < len(captions)  else ""),
+                        is_main=False,
+                        display_order=start_order + len(created),
+                    )
+                    created.append(img)
+                except Exception as e:
+                    url_errors.append({"url": url, "error": str(e)})
+
+        # 2) URL 다운로드 → 파일 저장 (save_remote=False 일 때만)
+        if (not save_remote) and url_list:
+            for url in url_list:
+                try:
+                    if not url.lower().startswith(("http://", "https://")):
+                        raise ValueError("only http/https is allowed")
+                    req = Request(url, headers={"User-Agent": "Mozilla/5.0"})
+                    with urlopen(req, timeout=10) as resp:
+                        data_bytes = resp.read()
+                        content_type = resp.headers.get_content_type() or "application/octet-stream"
+                    base = os.path.basename(urlparse(url).path) or f"remote_{uuid.uuid4().hex}"
+                    ext = os.path.splitext(base)[1] or (mimetypes.guess_extension(content_type) or ".jpg")
+                    name = base if base.endswith(ext) else base + ext
+                    files.append(ContentFile(data_bytes, name=name))
+                except Exception as e:
+                    url_errors.append({"url": url, "error": str(e)})
+
+        # 3) form-data 파일 저장
+        for i, f in enumerate(files):
+            img = ProductImage.objects.create(
+                product=product,
+                image=f,
+                is_remote=False,
+                alt_text=(alt_texts[i] if i < len(alt_texts) else ""),
+                caption=(captions[i]  if i < len(captions)  else ""),
+                is_main=False,
+                display_order=start_order + len(created),
+            )
+            created.append(img)
+
+        # 대표 지정
+        if created:
+            set_main = None
+            if 0 <= main_index < len(created):
+                set_main = created[main_index]
+            elif not product.images.filter(is_main=True).exists():
+                set_main = created[0]
+            if set_main:
+                product.images.filter(is_main=True).exclude(pk=set_main.pk).update(is_main=False)
+                set_main.is_main = True
+                set_main.save(update_fields=["is_main", "updated_at"])
+
+        out = ProductImageAdminSerializer(created, many=True, context={"request": request}).data
+        body = {"uploaded": out}
+        if url_errors:
+            body["url_errors"] = url_errors
+        return Response(body, status=status.HTTP_201_CREATED)
 
 
-# ---------- Stocks (ADMIN·MANAGER) ----------
+# ---------------------------------------------------------
+# Stocks (ADMIN·MANAGER)
+# ---------------------------------------------------------
 class StockFilter(df.FilterSet):
     product = df.UUIDFilter(field_name="product_id")
     option_key = df.CharFilter(field_name="option_key", lookup_expr="icontains")
@@ -142,13 +277,33 @@ class AdminProductStockViewSet(viewsets.ModelViewSet):
     ordering_fields = ["stock_quantity"]
 
 
-# ---------- Orders (ADMIN·MANAGER; refund은 ADMIN만) ----------
+# ---------------------------------------------------------
+# Product Images CRUD (ADMIN·MANAGER)
+# ---------------------------------------------------------
+@extend_schema(tags=["Admin • Product Images"])
+class AdminProductImageViewSet(viewsets.ModelViewSet):
+    """
+    /api/v1/admin/product-images/
+    - 파일 업로드: multipart/form-data (image 필수)
+    - 필터: ?product=<uuid>&stock=<uuid>&is_main=true
+    """
+    queryset = ProductImage.objects.all().select_related("product", "stock").order_by("product_id", "display_order", "-created_at")
+    serializer_class = ProductImageAdminSerializer
+    permission_classes = [permissions.IsAuthenticated, IsAdminOrManager]
+    parser_classes = [MultiPartParser, FormParser]
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ["product", "stock", "is_main"]
+    ordering_fields = ["display_order", "created_at"]
+
+
+# ---------------------------------------------------------
+# Orders (ADMIN·MANAGER; refund은 ADMIN만)
+# ---------------------------------------------------------
 class PurchaseFilter(df.FilterSet):
     status = df.CharFilter(field_name="status")
     user_email = df.CharFilter(field_name="user__email", lookup_expr="icontains")
-    # created_at → purchased_at 필드에 매핑
     created_from = df.IsoDateTimeFilter(field_name="purchased_at", lookup_expr="gte")
-    created_to = df.IsoDateTimeFilter(field_name="purchased_at", lookup_expr="lte")
+    created_to   = df.IsoDateTimeFilter(field_name="purchased_at", lookup_expr="lte")
 
     class Meta:
         model = Purchase
