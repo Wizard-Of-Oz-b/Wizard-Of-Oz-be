@@ -209,3 +209,95 @@ class ProductStock(models.Model):
 
     def __str__(self) -> str:
         return f"{self.product_id} / {self.option_key} = {self.stock_quantity}"
+
+
+def product_image_upload_to(instance: "ProductImage", filename: str) -> str:
+    """
+    /media/products/<product_id>/<랜덤>.확장자 경로로 저장
+    """
+    ext = (filename.rsplit(".", 1)[-1] or "").lower()
+    return f"products/{instance.product_id}/{uuid.uuid4().hex}.{ext}"
+
+
+class ProductImage(models.Model):
+    """
+    상품 이미지
+    - 파일은 스토리지(로컬/S3)에 저장, DB에는 메타 정보 저장
+    - 특정 옵션(variant) 이미지에 매핑하려면 stock 사용(선택)
+    - is_remote=True 이면 remote_url만 참조(다운로드 X)
+    """
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+        db_column="image_id",
+    )
+
+    product = models.ForeignKey(
+        "Product",
+        on_delete=models.CASCADE,
+        related_name="images",
+        db_column="product_id",
+    )
+
+    stock = models.ForeignKey(
+        "ProductStock",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="images",
+        db_column="stock_id",
+    )
+
+    # 파일 저장(기존) — URL 참조 케이스를 위해 blank/null 허용
+    image = models.ImageField(upload_to=product_image_upload_to, blank=True, null=True)
+
+    # ✅ URL만 참조(다운로드 X)
+    remote_url = models.URLField(blank=True, null=True)
+    is_remote  = models.BooleanField(default=False)
+
+    alt_text = models.CharField(max_length=255, blank=True, default="")
+    caption  = models.CharField(max_length=255, blank=True, default="")
+
+    is_main = models.BooleanField(default=False)
+    display_order = models.IntegerField(default=0, db_index=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "product_images"
+        indexes = [
+            models.Index(fields=["product", "display_order"]),
+            models.Index(fields=["product", "is_main"]),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                name="ck_product_image_display_order_ge_0",
+                check=models.Q(display_order__gte=0),
+            ),
+        ]
+
+    def __str__(self) -> str:
+        mode = "REMOTE" if self.is_remote else "FILE"
+        return f"ProductImage({self.id}) {self.product_id} [{mode}] main={self.is_main}"
+
+    # ✅ 통합 접근 URL (파일이면 MEDIA_URL 기반, 원격이면 원격 URL)
+    @property
+    def url(self) -> str | None:
+        if self.image:
+            try:
+                return self.image.url
+            except Exception:
+                return None
+        return self.remote_url
+
+    # ✅ 한쪽만 필수(파일 or 원격)
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if self.is_remote:
+            if not self.remote_url:
+                raise ValidationError({"remote_url": "is_remote=True면 remote_url이 필요합니다."})
+        else:
+            if not self.image:
+                raise ValidationError({"image": "is_remote=False면 image 파일이 필요합니다."})
