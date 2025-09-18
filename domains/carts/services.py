@@ -1,33 +1,36 @@
+# domains/carts/services.py
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Any
 from urllib.parse import urlencode
 
 from django.db import transaction
 from django.utils import timezone
-from django.conf import settings
 
 from .models import Cart, CartItem
 from domains.catalog.models import Product
+from domains.orders.utils import parse_option_key_safe
 
 
-def make_option_key(options: Dict) -> str:
+def make_option_key(options: Dict[str, Any] | None) -> str:
     """
-    옵션 dict을 안정적으로 직렬화해 해시 키를 만든다.
+    옵션 dict을 안정적으로 직렬화해 키를 생성.
     예: {"size":"L","color":"red"} -> "color=red&size=L"
     """
     options = options or {}
-    # 값이 리스트/딕트인 경우도 문자열화(필요에 따라 강화 가능)
-    flat = {str(k): (",".join(map(str, v)) if isinstance(v, (list, tuple)) else str(v))
-            for k, v in options.items()}
-    return urlencode(sorted(flat.items()))  # 키 정렬
+    flat = {
+        str(k): (",".join(map(str, v)) if isinstance(v, (list, tuple)) else str(v))
+        for k, v in options.items()
+    }
+    return urlencode(sorted(flat.items()))  # 키 정렬 고정
 
 
 @transaction.atomic
 def get_or_create_user_cart(user) -> Cart:
+    """유저의 카트를 잠금(select_for_update)으로 확보하거나 생성."""
     cart, _ = Cart.objects.select_for_update().get_or_create(user=user)
-    # 만료되었으면 재생성 (선택)
+    # 만료 처리(선택): 만료됐으면 새로 생성
     if cart.expires_at and cart.expires_at < timezone.now():
         cart.delete()
         cart = Cart.objects.create(user=user)
@@ -39,16 +42,25 @@ def add_or_update_item(
     *,
     user,
     product: Product,
-    options: Dict,
+    options: Dict[str, Any] | str | None,
     quantity: int = 1,
     unit_price: Decimal | None = None,
 ) -> Tuple[Cart, CartItem]:
     """
     같은 (product, option_key)가 있으면 수량만 증가, 없으면 새로 추가.
-    unit_price는 신뢰 가능한 서버 측에서 결정(보통 product.price 스냅샷).
+    options는 dict 또는 'k=v&k2=v2' 문자열 모두 허용.
     """
     if quantity <= 0:
         raise ValueError("quantity must be >= 1")
+
+    # 문자열 → dict 안전 변환
+    if isinstance(options, str):
+        options = parse_option_key_safe(options) or {}
+    elif options is None:
+        options = {}
+
+    if not isinstance(options, dict):
+        raise ValueError("options must be dict or 'k=v&k2=v2' string")
 
     cart = get_or_create_user_cart(user)
     option_key = make_option_key(options)
@@ -61,14 +73,45 @@ def add_or_update_item(
         product=product,
         option_key=option_key,
         defaults={
-            "options": options or {},
+            "options": options,
             "quantity": quantity,
             "unit_price": unit_price,
         },
     )
     if not created:
-        # 합산 정책(필요하면 대입 정책으로 변경)
+        # 합산 정책(원하면 대입 정책으로 바꿔도 됨)
         item.quantity += quantity
-        item.unit_price = unit_price  # 최신 스냅샷으로 갱신 (원하지 않으면 제거)
+        item.unit_price = unit_price  # 최신 단가 스냅샷(원치 않으면 제거)
         item.save(update_fields=["quantity", "unit_price"])
+
     return cart, item
+
+
+@transaction.atomic
+def get_user_cart(user, create: bool = True) -> Cart | None:
+    """
+    로그인 유저의 장바구니를 반환. 없으면 create=True일 때 생성.
+    익명 유저면 None.
+    """
+    if not user or getattr(user, "is_anonymous", False):
+        return None
+    if create:
+        cart, _ = Cart.objects.get_or_create(user=user)
+        return cart
+    return Cart.objects.filter(user=user).first()
+
+
+@transaction.atomic
+def clear_cart(cart: Cart | None) -> None:
+    """장바구니 아이템 전체 삭제(체크아웃 완료 후 호출)."""
+    if cart:
+        cart.items.all().delete()
+
+
+__all__ = [
+    "get_user_cart",
+    "get_or_create_user_cart",
+    "add_or_update_item",
+    "make_option_key",
+    "clear_cart",
+]
