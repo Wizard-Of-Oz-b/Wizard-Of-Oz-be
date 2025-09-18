@@ -1,3 +1,6 @@
+# config/urls.py
+from django.conf import settings
+from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import path, include
 from django.views.generic import RedirectView
@@ -6,7 +9,6 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 # 소셜 로그인 뷰 (기존 그대로)
 from domains.accounts.views_social import SocialLoginView, SocialUnlinkView  # noqa: F401
-# 웹훅 경로를 루트에서 직접 매핑하기 위해 import
 from domains.shipments.views import ShipmentWebhookAPI
 
 
@@ -26,7 +28,7 @@ urlpatterns = [
     # Django admin
     path("admin/", admin.site.urls),
 
-    # OpenAPI / Swagger
+    # OpenAPI 스키마 & Swagger UI (뷰 클래스 방식 유지)
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="docs"),
 
@@ -46,8 +48,15 @@ urlpatterns = [
 
     # 임시 OAuth 콜백 & 루트 리다이렉트
     path("oauth/callback", oauth_debug_callback),
-    path("", RedirectView.as_view(url="/api/docs", permanent=False)),
 
+    # 루트 → Swagger로 리다이렉트
+    path("", RedirectView.as_view(url="/api/docs", permanent=False)),
+    path("api/v1/auth/social/<str:provider>/login", SocialLoginView.as_view(), name="social-login"),
+    path("api/v1/auth/social/<str:provider>/unlink", SocialUnlinkView.as_view(), name="social-unlink"),
+    static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     # 헬스체크
     path("healthz/", healthz),
 ]
+
+def healthz(_): return JsonResponse({"ok": True})
+urlpatterns += [path("healthz/", healthz)]

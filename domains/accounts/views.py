@@ -1,27 +1,34 @@
 # domains/accounts/views.py
-from rest_framework.views import APIView
-from rest_framework_simplejwt.tokens import RefreshToken
-from drf_spectacular.utils import extend_schema, OpenApiResponse
-from django_filters.rest_framework import DjangoFilterBackend
+from django.contrib.auth import get_user_model
+from django.conf import settings
 
 import django_filters as df
-from .serializers import (
-    RegisterSerializer, LoginSerializer, MeSerializer,
-    EmptySerializer, LoginRequestSerializer,
-    TokenPairResponseSerializer,
-)
-from .utils import refresh_cookie_kwargs  # ✅ 여기서 가져옴
-from .models import SocialAccount
-from rest_framework import generics, permissions, status, filters
+from django_filters.rest_framework import DjangoFilterBackend
+
+from rest_framework import generics, permissions, status, filters, serializers
 from rest_framework.response import Response
-from drf_spectacular.utils import extend_schema
-from django.contrib.auth import get_user_model
-from .serializers import MeSerializer, MeUpdateSerializer, SocialAccountSerializer
+from rest_framework.views import APIView
+from rest_framework_simplejwt.tokens import RefreshToken
+
+from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
+
+from .models import SocialAccount
+from .utils import refresh_cookie_kwargs
+from .serializers import (
+    RegisterSerializer,
+    LoginSerializer,
+    LoginRequestSerializer,
+    TokenPairResponseSerializer,
+    EmptySerializer,
+    MeSerializer,
+    MeUpdateSerializer,
+    SocialAccountSerializer,
+)
 
 User = get_user_model()
 
 
-
+# ---------- 인증/토큰 ----------
 @extend_schema(
     request=RegisterSerializer,
     responses={201: OpenApiResponse(description="회원가입 완료")},
@@ -46,7 +53,6 @@ class LoginView(APIView):
         refresh = RefreshToken.for_user(user)
         access = str(refresh.access_token)
 
-        from django.conf import settings
         resp = Response({"access": access, "refresh": str(refresh)}, status=status.HTTP_200_OK)
         resp.set_cookie("refresh", str(refresh), **refresh_cookie_kwargs(settings.DEBUG))
         return resp
@@ -69,7 +75,6 @@ class RefreshView(APIView):
             user = User.objects.get(id=refresh["user_id"])
             new_refresh = RefreshToken.for_user(user)
 
-            from django.conf import settings
             resp = Response({"access": new_access, "refresh": str(new_refresh)}, status=200)
             resp.set_cookie("refresh", str(new_refresh), **refresh_cookie_kwargs(settings.DEBUG))
             return resp
@@ -93,15 +98,17 @@ class LogoutView(APIView):
             except Exception:
                 pass
         resp = Response(status=204)
+        # refresh_cookie_kwargs에서 path를 "/api/v1/auth/"로 설정했다는 가정 하에 동일 경로로 삭제
         resp.delete_cookie("refresh", path="/api/v1/auth/")
         return resp
 
 
+# ---------- 내 프로필 ----------
 class MeView(generics.RetrieveUpdateDestroyAPIView):
     """
-    GET   /api/v1/users/me/      내 프로필 조회
-    PATCH /api/v1/users/me/      이름/닉네임/전화/주소 수정 & (옵션) 비밀번호 변경
-    DELETE/api/v1/users/me/      소프트 삭제(status=deleted, is_active=False)
+    GET    /api/v1/users/me/      내 프로필 조회
+    PATCH  /api/v1/users/me/      이름/닉네임/전화/주소 수정 & (옵션) 비밀번호 변경
+    DELETE /api/v1/users/me/      소프트 삭제(status=deleted, is_active=False)
     """
     permission_classes = [permissions.IsAuthenticated]
     http_method_names = ["get", "patch", "delete", "head", "options"]
@@ -127,7 +134,10 @@ class MeView(generics.RetrieveUpdateDestroyAPIView):
         user.status = "deleted"
         if hasattr(user, "is_active"):
             user.is_active = False
-        user.save(update_fields=["status", "is_active", "updated_at"] if hasattr(user, "is_active") else ["status", "updated_at"])
+        update_fields = ["status", "updated_at"]
+        if hasattr(user, "is_active"):
+            update_fields.insert(1, "is_active")
+        user.save(update_fields=update_fields)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -138,6 +148,7 @@ class MySocialAccountListAPI(generics.ListAPIView):
     """
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = SocialAccountSerializer
+    queryset = SocialAccount.objects.none()
 
     def get_queryset(self):
         return SocialAccount.objects.filter(user=self.request.user).order_by("provider", "created_at")
@@ -174,7 +185,7 @@ class UserListAdminAPI(generics.ListAPIView):
     GET /api/v1/users/   (Admin)
       - ?email=, ?nickname=, ?status=, ?created_from=, ?created_to=
     """
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [permissions.IsAdminUser]  # is_staff=True(=admin)만 접근
     queryset = User.objects.all().order_by("-created_at")
     serializer_class = MeSerializer
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter, filters.SearchFilter]
@@ -191,3 +202,7 @@ class UserDetailAdminAPI(generics.RetrieveAPIView):
     queryset = User.objects.all()
     serializer_class = MeSerializer
     lookup_url_kwarg = "user_id"
+
+
+
+

@@ -10,3 +10,12 @@ class IsSelf(BasePermission):
             return False
         # obj가 User 인스턴스라고 가정
         return getattr(obj, "pk", None) == getattr(user, "pk", None)
+
+
+class IsAdminRole(BasePermission):
+    message = "관리자만 접근할 수 있습니다."
+    def has_permission(self, request, view):
+        return bool(
+            request.user and request.user.is_authenticated
+            and getattr(request.user, "role", "") == "admin"
+        )
