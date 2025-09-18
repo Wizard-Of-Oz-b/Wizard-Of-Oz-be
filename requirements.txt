@@ -40,3 +40,4 @@ celery[redis]==5.*
 django-celery-results==2.*
 django-celery-beat==2.*
 psycopg[binary]==3.2.10
+Pillow==11.0.0
