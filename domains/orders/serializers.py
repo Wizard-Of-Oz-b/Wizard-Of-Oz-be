@@ -1,5 +1,6 @@
 # domains/orders/serializers.py
 from __future__ import annotations
+from domains.orders.utils import parse_option_key_safe
 from rest_framework import serializers
 from .models import Purchase
 
