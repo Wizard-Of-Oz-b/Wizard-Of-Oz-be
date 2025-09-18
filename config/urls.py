@@ -6,7 +6,6 @@ from django.urls import path, include
 from django.views.generic import RedirectView
 from django.http import HttpResponse, JsonResponse
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
-
 # 소셜 로그인 뷰 (기존 그대로)
 from domains.accounts.views_social import SocialLoginView, SocialUnlinkView  # noqa: F401
 from domains.shipments.views import ShipmentWebhookAPI
@@ -53,10 +52,14 @@ urlpatterns = [
     path("", RedirectView.as_view(url="/api/docs", permanent=False)),
     path("api/v1/auth/social/<str:provider>/login", SocialLoginView.as_view(), name="social-login"),
     path("api/v1/auth/social/<str:provider>/unlink", SocialUnlinkView.as_view(), name="social-unlink"),
-    static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     # 헬스체크
     path("healthz/", healthz),
 ]
 
 def healthz(_): return JsonResponse({"ok": True})
 urlpatterns += [path("healthz/", healthz)]
+
+if settings.DEBUG:
+    # 개발 환경에서만 미디어/정적 파일 서빙
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

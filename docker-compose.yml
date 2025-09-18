@@ -18,7 +18,7 @@ services:
 
   redis:
     image: redis:7
-    # 내부 통신만 쓸 거면 ports 생략 가능
+    # 내부 통신만 쓰면 ports 생략 가능하지만, 디버깅 편의상 노출
     ports:
       - "6379:6379"
     healthcheck:
@@ -29,7 +29,12 @@ services:
     restart: unless-stopped
 
   web:
-    build: .
+    build:
+      context: .
+      args:
+        # 호스트 UID/GID를 넘기면 바인드 마운트 권한 이슈 감소
+        APP_UID: "${UID:-1000}"
+        APP_GID: "${GID:-1000}"
     env_file: .env.docker
     depends_on:
       db:
@@ -38,6 +43,8 @@ services:
         condition: service_healthy
     ports:
       - "8000:8000"
+    # 비루트 유저로 실행(이미지에서도 USER 전환했지만, 바인드 마운트 권한 문제 예방용)
+    user: "${UID:-1000}:${GID:-1000}"
     command: >
       bash -lc "
         python manage.py migrate --noinput &&
@@ -52,32 +59,55 @@ services:
       "
     volumes:
       - .:/app
+      # 필요하면 정적/미디어를 분리된 볼륨으로 빼도 됨(바인드 마운트가 우선이므로 경로 바꿔야 함)
+      # - web-static:/app/staticfiles
+      # - web-media:/app/media
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8000/healthz || exit 1"]
+      # 루트(/)는 302 → 성공. 4xx만 실패로 간주되므로 심플하게 헤더만 확인
+      test: ["CMD-SHELL", "curl -fsSI http://localhost:8000/ >/dev/null || exit 1"]
       interval: 10s
       timeout: 3s
       retries: 20
     restart: unless-stopped
 
   worker:
-    build: .
+    build:
+      context: .
+      args:
+        APP_UID: "${UID:-1000}"
+        APP_GID: "${GID:-1000}"
     env_file: .env.docker
     depends_on:
       db: { condition: service_healthy }
       redis: { condition: service_healthy }
-    entrypoint: [""]                               # ← 중요!
-    command: bash -lc "celery -A config worker -l info"
+    user: "${UID:-1000}:${GID:-1000}"
+    command: >
+      bash -lc "celery -A config worker -l info --concurrency=${CELERY_CONCURRENCY:-10}"
+    volumes:
+      - .:/app
     restart: unless-stopped
 
   beat:
-    build: .
+    build:
+      context: .
+      args:
+        APP_UID: "${UID:-1000}"
+        APP_GID: "${GID:-1000}"
     env_file: .env.docker
     depends_on:
       db: { condition: service_healthy }
       redis: { condition: service_healthy }
-    entrypoint: [""]                               # ← 중요!
-    command: bash -lc "celery -A config beat -l info"
+    user: "${UID:-1000}:${GID:-1000}"
+    # 스케줄 파일을 볼륨(/data)에 저장해서 재시작해도 유지
+    command: >
+      bash -lc "celery -A config beat -l info -s /data/celerybeat-schedule"
+    volumes:
+      - .:/app
+      - beat-data:/data
     restart: unless-stopped
 
 volumes:
   dbdata:
+  # web-static:
+  # web-media:
+  beat-data:

@@ -108,7 +108,7 @@ DATABASES = {
         "NAME": env_multi("DB_NAME", "POSTGRES_DB", default="shopapi"),
         "USER": env_multi("DB_USER", "POSTGRES_USER", default="postgres"),
         "PASSWORD": env_multi("DB_PASSWORD", "POSTGRES_PASSWORD", default=""),
-        "HOST": env_multi("DB_HOST", "POSTGRES_HOST", default="127.0.0.1"),
+        "HOST": env_multi("DB_HOST", "POSTGRES_HOST", default="db"),
         "PORT": env_multi("DB_PORT", "POSTGRES_PORT", default="5432"),
     }
 }
@@ -259,7 +259,7 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 # Celery
-CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/0")
+CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://redis:6379/0")
 CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND", CELERY_BROKER_URL)
 CELERY_TIMEZONE = "Asia/Seoul"
 CELERY_TASK_TIME_LIMIT = 60 * 10
@@ -267,6 +267,7 @@ CELERY_TASK_TRACK_STARTED = True
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 
 CELERY_BEAT_SCHEDULE = {
     "poll-open-shipments-30m": {
