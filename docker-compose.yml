@@ -8,18 +8,33 @@ services:
     volumes:
       - dbdata:/var/lib/postgresql/data
     ports:
-      - "5433:5432"           # host 5433 -> container 5432
+      - "5433:5432"   # host 5433 -> container 5432
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U shop -d shopapi"]
       interval: 5s
       timeout: 3s
       retries: 20
+    restart: unless-stopped
+
+  redis:
+    image: redis:7
+    # 내부 통신만 쓸 거면 ports 생략 가능
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
 
   web:
     build: .
     env_file: .env.docker
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     ports:
       - "8000:8000"
@@ -35,9 +50,34 @@ services:
           --worker-tmp-dir /dev/shm --forwarded-allow-ips="*"
           --lifespan off
       "
-    # 개발 중에만 마운트(운영은 제거 권장)
     volumes:
       - .:/app
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8000/healthz || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  worker:
+    build: .
+    env_file: .env.docker
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    entrypoint: [""]                               # ← 중요!
+    command: bash -lc "celery -A config worker -l info"
+    restart: unless-stopped
+
+  beat:
+    build: .
+    env_file: .env.docker
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    entrypoint: [""]                               # ← 중요!
+    command: bash -lc "celery -A config beat -l info"
+    restart: unless-stopped
 
 volumes:
   dbdata:
