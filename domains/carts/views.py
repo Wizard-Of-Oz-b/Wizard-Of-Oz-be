@@ -1,14 +1,19 @@
 # domains/carts/views.py
+from __future__ import annotations
+
+from django.shortcuts import get_object_or_404
 from rest_framework import status, serializers, permissions, generics
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
 
-from .models import CartItem
+from django.db.models import Prefetch
+
+from .models import CartItem, Cart
 from .serializers import CartSerializer, AddCartItemSerializer, CartItemSerializer
 from .services import get_or_create_user_cart
+from domains.catalog.models import Product
 
 
 # PATCH 요청 바디 검증용(수량만 받음)
@@ -26,7 +31,25 @@ class MyCartView(APIView):
         tags=["Carts"],
     )
     def get(self, request):
+        """
+        내 카트 조회.
+        - N+1 방지: items -> product (및 product.images가 있으면 이미지까지) prefetch
+        """
+        # 카트가 없으면 생성
         cart = get_or_create_user_cart(request.user)
+
+        # Product에 images related_name이 있으면 prefetch에 포함
+        prefetches = ["items__product"]
+        if hasattr(Product, "images"):
+            prefetches.append("items__product__images")
+
+        # 프리패치된 상태로 다시 로드
+        cart = (
+            Cart.objects
+            .select_related("user")
+            .prefetch_related(*prefetches)
+            .get(pk=cart.pk)
+        )
         return Response(CartSerializer(cart).data)
 
 
@@ -41,10 +64,21 @@ class CartItemAddView(APIView):
         tags=["Carts"],
     )
     def post(self, request):
+        """
+        장바구니에 상품 추가.
+        - 응답에서 image_url을 올바르게 주기 위해 product(+images)까지 프리패치해서 반환
+        """
         ser = AddCartItemSerializer(data=request.data, context={"request": request})
         ser.is_valid(raise_exception=True)
         item = ser.save()
-        return Response(ser.to_representation(item), status=status.HTTP_201_CREATED)
+
+        # 응답 시 N+1 방지를 위해 재조회(상품/이미지 프리패치)
+        qs = CartItem.objects.select_related("product")
+        if hasattr(Product, "images"):
+            qs = qs.prefetch_related("product__images")
+        item = qs.get(pk=item.pk)
+
+        return Response(CartItemSerializer(item).data, status=status.HTTP_201_CREATED)
 
 
 class CartItemDeleteByProductOptionAPI(APIView):
@@ -69,8 +103,13 @@ class CartItemDeleteByProductOptionAPI(APIView):
             ),
         ],
         responses={204: None, 400: dict, 404: dict},
+        tags=["Carts"],
     )
     def delete(self, request, product_id):
+        """
+        상품ID + option_key 조합으로 해당 라인만 삭제.
+        (옵션 없는 상품은 option_key=""로 호출)
+        """
         # 쿼리스트링 우선, 없으면 바디에서도 허용(프론트 편의)
         option_key = request.query_params.get("option_key")
         if option_key is None:
@@ -91,6 +130,7 @@ class CartItemDeleteByProductOptionAPI(APIView):
             return Response({"detail": "item_not_found"}, status=status.HTTP_404_NOT_FOUND)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 class CartItemDetailView(generics.DestroyAPIView):
     """
