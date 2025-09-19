@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     "domains.orders",
     "domains.shipments",
     "domains.carts",
+    "domains.payments",
 ]
 
 AUTH_USER_MODEL = "accounts.User"

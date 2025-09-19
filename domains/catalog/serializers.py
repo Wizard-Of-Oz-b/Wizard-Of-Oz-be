@@ -178,6 +178,8 @@ class ProductStockReadSerializer(serializers.ModelSerializer):
 
 class ProductStockWriteSerializer(serializers.ModelSerializer):
     product_id = serializers.UUIDField()  # 입력은 product_id로 받기
+    option_key = serializers.CharField(required=False, allow_blank=True, default="")
+    options    = serializers.JSONField(required=False, default=dict)
 
     class Meta:
         model = ProductStock
@@ -190,12 +192,17 @@ class ProductStockWriteSerializer(serializers.ModelSerializer):
 
     def create(self, validated):
         pid = validated.pop("product_id")
+        # 옵션 없는 경우 key가 안 들어오면 "" 로 통일
+        if "option_key" not in validated or validated.get("option_key") is None:
+            validated["option_key"] = ""
+        # options 생략시 {}
+        if "options" not in validated or validated.get("options") is None:
+            validated["options"] = {}
         return ProductStock.objects.create(product_id=pid, **validated)
 
     def update(self, inst, validated):
-        # 필요 시 수정 허용 필드만 제한
         for f in ("option_key", "options", "stock_quantity"):
             if f in validated:
-                setattr(inst, f, validated[f])
+                setattr(inst, f, validated[f] if f != "options" or validated[f] is not None else {})
         inst.save()
         return inst

@@ -1,12 +1,11 @@
 from django.urls import path
-from .views_toss import (
-    TossClientKeyAPI, TossConfirmAPI,
-    TossCancelAPI, TossWebhookAPI,  # 취소/웹훅은 선택
-)
+from .views_toss import TossConfirmAPI, PaymentRetrieveAPI, TossCancelAPI, TossSyncAPI
+
+app_name = "payments_toss"
 
 urlpatterns = [
-    path("client-key/", TossClientKeyAPI.as_view()),     # GET  클라이언트 키 전달(프론트 편의)
-    path("confirm/",    TossConfirmAPI.as_view()),       # POST 성공 리다이렉트 후 승인
-    path("cancel/",     TossCancelAPI.as_view()),        # POST 환불/취소 (선택)
-    path("webhook/",    TossWebhookAPI.as_view()),       # POST 웹훅 검증 (선택)
+    path("confirm/", TossConfirmAPI.as_view(), name="confirm"),                # POST
+    path("<uuid:payment_id>/", PaymentRetrieveAPI.as_view(), name="retrieve"), # GET
+    path("<uuid:payment_id>/cancel/", TossCancelAPI.as_view(), name="cancel"), # POST
+    path("<uuid:payment_id>/sync/", TossSyncAPI.as_view(), name="sync"),       # POST
 ]

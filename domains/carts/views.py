@@ -1,5 +1,5 @@
 # domains/carts/views.py
-from rest_framework import status, serializers
+from rest_framework import status, serializers, permissions, generics
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -47,42 +47,59 @@ class CartItemAddView(APIView):
         return Response(ser.to_representation(item), status=status.HTTP_201_CREATED)
 
 
-class CartItemDetailView(APIView):
-    permission_classes = [IsAuthenticated]
-    serializer_class = CartItemSerializer
+class CartItemDeleteByProductOptionAPI(APIView):
+    permission_classes = [permissions.IsAuthenticated]
 
     @extend_schema(
-        operation_id="UpdateCartItem",
+        operation_id="DeleteCartItemByProductAndOption",
         parameters=[
-            OpenApiParameter("item_id", OpenApiTypes.UUID, OpenApiParameter.PATH),  # urls가 <uuid:item_id> 라면 UUID, int면 INT
+            OpenApiParameter(
+                name="product_id",
+                type=OpenApiTypes.UUID,
+                location=OpenApiParameter.PATH,
+                required=True,
+                description="상품 ID (UUID)",
+            ),
+            OpenApiParameter(
+                name="option_key",
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                required=True,
+                description="옵션키. 예) color=black&size=M (옵션 없는 상품은 빈 문자열 ''로 전달)",
+            ),
         ],
-        request=UpdateCartQtySerializer,
-        responses=CartItemSerializer,
-        tags=["Carts"],
+        responses={204: None, 400: dict, 404: dict},
     )
-    def patch(self, request, item_id):
-        item = get_object_or_404(
-            CartItem.objects.select_related("cart"),
-            pk=item_id,
-            cart__user=request.user,
-        )
-        ser = UpdateCartQtySerializer(data=request.data)
-        ser.is_valid(raise_exception=True)
-        item.quantity = ser.validated_data["quantity"]
-        item.save(update_fields=["quantity"])
-        return Response(CartItemSerializer(item).data)
+    def delete(self, request, product_id):
+        # 쿼리스트링 우선, 없으면 바디에서도 허용(프론트 편의)
+        option_key = request.query_params.get("option_key")
+        if option_key is None:
+            option_key = (request.data or {}).get("option_key")
 
-    @extend_schema(
-        operation_id="DeleteCartItem",
-        parameters=[OpenApiParameter("item_id", OpenApiTypes.UUID, OpenApiParameter.PATH)],
-        responses={204: None},
-        tags=["Carts"],
-    )
-    def delete(self, request, item_id):
-        item = get_object_or_404(
-            CartItem.objects.select_related("cart"),
-            pk=item_id,
+        if option_key is None:
+            return Response({"detail": "option_key is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 본인 장바구니에서만 삭제 가능
+        qs = CartItem.objects.filter(
             cart__user=request.user,
+            product_id=product_id,
+            option_key=option_key,
         )
-        item.delete()
+
+        deleted, _ = qs.delete()
+        if deleted == 0:
+            return Response({"detail": "item_not_found"}, status=status.HTTP_404_NOT_FOUND)
+
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+class CartItemDetailView(generics.DestroyAPIView):
+    """
+    DELETE /api/v1/carts/items/<item_id>/
+    본인 장바구니의 해당 item_id 한 줄만 삭제
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    lookup_url_kwarg = "item_id"
+
+    def get_queryset(self):
+        # 본인 소유 카트만
+        return CartItem.objects.filter(cart__user=self.request.user)

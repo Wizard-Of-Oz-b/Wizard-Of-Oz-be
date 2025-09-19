@@ -44,13 +44,19 @@ class ProductListCreateAPI(generics.ListCreateAPIView):
     serializer_class = ProductReadSerializer  # 기본 읽기
 
     # 이미지/카테고리 프리패치 + 최신순
+    def _image_accessor(self):
+        # Product -> ProductImage 역참조 이름을 런타임에 탐색
+        for f in Product._meta.get_fields():
+            if f.auto_created and f.is_relation and getattr(f, "related_model", None):
+                if f.related_model.__name__ in ("ProductImage", "Image",):
+                    return f.get_accessor_name()  # ex) "images" 또는 "productimage_set"
+        return None
+
     def get_queryset(self):
-        qs = (
-            Product.objects.all()
-            .select_related("category")
-            .prefetch_related("productimage_set")  # related_name이 images라면 "images"로 바꿔도 됨
-            .order_by("-created_at")
-        )
+        qs = Product.objects.all().select_related("category").order_by("-created_at")
+        acc = self._image_accessor()
+        if acc:
+            qs = qs.prefetch_related(acc)
         return qs
 
     def get_permissions(self):
@@ -101,11 +107,16 @@ class ProductDetailAPI(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = ProductReadSerializer
 
     def get_queryset(self):
-        return (
-            Product.objects.all()
-            .select_related("category")
-            .prefetch_related("productimage_set")  # related_name이 images라면 "images"
-        )
+        qs = Product.objects.all().select_related("category")
+        acc = None
+        for f in Product._meta.get_fields():
+            if f.auto_created and f.is_relation and getattr(f, "related_model", None):
+                if f.related_model.__name__ in ("ProductImage", "Image",):
+                    acc = f.get_accessor_name()
+                    break
+        if acc:
+            qs = qs.prefetch_related(acc)
+        return qs
 
     def get_permissions(self):
         # 열람은 모두 허용, 수정/삭제는 관리자만
