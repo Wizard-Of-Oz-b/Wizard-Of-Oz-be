@@ -1,10 +1,18 @@
 # domains/catalog/serializers.py
 from __future__ import annotations
 
+from typing import Iterable
 from rest_framework import serializers
-from .models import Category,ProductStock, Product
+from .models import Category, Product, ProductStock
 
-
+# ─────────────────────────────────────────────────────────────────────────────
+# 공용 유틸
+# ─────────────────────────────────────────────────────────────────────────────
+def _abs_url(request, url: str) -> str:
+    """request가 있으면 절대 URL, 없으면 상대 URL을 반환."""
+    if not url:
+        return url
+    return request.build_absolute_uri(url) if request else url
 
 
 # =========================
@@ -26,6 +34,28 @@ class CategoryWriteSerializer(serializers.ModelSerializer):
 
 
 # =========================
+# Product Images (Slim)
+# =========================
+class ProductImageSlim(serializers.Serializer):
+    """
+    모델명을 모르거나 related_name이 불확실한 상황을 위해
+    순수 Serializer로 슬림 구조만 내려준다.
+    """
+    id = serializers.CharField()
+    url = serializers.CharField()
+
+    @staticmethod
+    def from_instance(img, request=None) -> dict:
+        # img.image.url 이라고 가정 (일반적인 ImageField 이름)
+        # 필드명이 다르면 필요 시 여기만 수정하면 됨.
+        url = getattr(getattr(img, "image", None), "url", "")
+        return {
+            "id": str(getattr(img, "pk", getattr(img, "id", ""))),
+            "url": _abs_url(request, url),
+        }
+
+
+# =========================
 # Products (UUID, FK -> Category)
 # =========================
 class ProductReadSerializer(serializers.ModelSerializer):
@@ -39,6 +69,10 @@ class ProductReadSerializer(serializers.ModelSerializer):
     price = serializers.DecimalField(max_digits=12, decimal_places=2)
     options = serializers.JSONField(required=False)
 
+    # 이미지: 대표 1장 + 전체 목록
+    primary_image = serializers.SerializerMethodField()
+    images = serializers.SerializerMethodField()
+
     class Meta:
         model = Product
         fields = (
@@ -50,10 +84,41 @@ class ProductReadSerializer(serializers.ModelSerializer):
             "options",
             "category_id",    # 읽기 전용 FK id
             "category_name",  # 읽기 전용 FK name
+            "primary_image",  # 대표 이미지(첫 번째)
+            "images",         # 모든 이미지(슬림)
             "created_at",
             "updated_at",
         )
-        read_only_fields = ("product_id", "category_id", "category_name", "created_at", "updated_at")
+        read_only_fields = (
+            "product_id",
+            "category_id",
+            "category_name",
+            "primary_image",
+            "images",
+            "created_at",
+            "updated_at",
+        )
+
+    # --- 이미지 헬퍼 ---
+    def _iter_product_images(self, obj: Product) -> Iterable:
+        """
+        related_name이 'images' 또는 기본 'productimage_set' 둘 다 지원.
+        없다면 빈 리스트.
+        """
+        if hasattr(obj, "images"):
+            return getattr(obj, "images").all()
+        if hasattr(obj, "productimage_set"):
+            return getattr(obj, "productimage_set").all()
+        return []
+
+    def get_images(self, obj: Product):
+        request = self.context.get("request")
+        imgs = self._iter_product_images(obj)
+        return [ProductImageSlim.from_instance(img, request) for img in imgs]
+
+    def get_primary_image(self, obj: Product):
+        all_images = self.get_images(obj)
+        return all_images[0] if all_images else None
 
 
 class ProductWriteSerializer(serializers.ModelSerializer):
@@ -91,15 +156,25 @@ class ProductWriteSerializer(serializers.ModelSerializer):
         return instance
 
 
-
+# =========================
+# Product Stock
+# =========================
 class ProductStockReadSerializer(serializers.ModelSerializer):
     stock_id = serializers.UUIDField(source="id", read_only=True)
-    product_id = serializers.UUIDField( read_only=True)
+    product_id = serializers.UUIDField(read_only=True)
 
     class Meta:
         model = ProductStock
-        fields = ("stock_id", "product_id", "option_key", "options",
-                  "stock_quantity", "created_at", "updated_at")
+        fields = (
+            "stock_id",
+            "product_id",
+            "option_key",
+            "options",
+            "stock_quantity",
+            "created_at",
+            "updated_at",
+        )
+
 
 class ProductStockWriteSerializer(serializers.ModelSerializer):
     product_id = serializers.UUIDField()  # 입력은 product_id로 받기
