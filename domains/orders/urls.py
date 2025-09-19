@@ -6,7 +6,7 @@ from .views import (
     PurchaseDetailAPI,
     PurchaseCancelAPI,
     PurchaseRefundAPI,
-    CheckoutView,
+    CheckoutView, CheckoutAPI, OrderItemDetailAPI, OrderItemListAPI,
 )
 
 urlpatterns = [
@@ -19,5 +19,8 @@ urlpatterns = [
     path("purchases/<uuid:purchase_id>/refund/", PurchaseRefundAPI.as_view(), name="purchase-refund"),
 
     # Checkout
-    path("orders/checkout/", CheckoutView.as_view(), name="checkout"),
+    path("checkout/", CheckoutAPI.as_view(), name="checkout"),
+# OrderItem 조회
+    path("purchases/<uuid:purchase_id>/items/", OrderItemListAPI.as_view(), name="orderitem-list-by-order"),
+    path("order-items/<uuid:item_id>/", OrderItemDetailAPI.as_view(), name="orderitem-detail"),
 ]
