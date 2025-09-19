@@ -32,43 +32,26 @@ services:
     build:
       context: .
       args:
-        # 호스트 UID/GID를 넘기면 바인드 마운트 권한 이슈 감소
         APP_UID: "${UID:-1000}"
         APP_GID: "${GID:-1000}"
     env_file: .env.docker
     depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
     ports:
       - "8000:8000"
-    # 비루트 유저로 실행(이미지에서도 USER 전환했지만, 바인드 마운트 권한 문제 예방용)
     user: "${UID:-1000}:${GID:-1000}"
-    command: >
-      bash -lc "
-        python manage.py migrate --noinput &&
-        python manage.py collectstatic --noinput &&
-        exec gunicorn config.asgi:application -k uvicorn.workers.UvicornWorker
-          --bind 0.0.0.0:8000
-          --workers ${GUNICORN_WORKERS:-4} --threads ${GUNICORN_THREADS:-2}
-          --log-level info --access-logfile - --error-logfile -
-          --timeout 60 --graceful-timeout 30 --keep-alive 5
-          --worker-tmp-dir /dev/shm --forwarded-allow-ips="*"
-          --lifespan off
-      "
+    entrypoint: [ "/app/entrypoint.sh" ]             # ★ 배시 인용문제 제거
+    command: [ ]                                    # (ENTRYPOINT에서 gunicorn 실행)
     volumes:
       - .:/app
-      # 필요하면 정적/미디어를 분리된 볼륨으로 빼도 됨(바인드 마운트가 우선이므로 경로 바꿔야 함)
-      # - web-static:/app/staticfiles
-      # - web-media:/app/media
     healthcheck:
-      # 루트(/)는 302 → 성공. 4xx만 실패로 간주되므로 심플하게 헤더만 확인
-      test: ["CMD-SHELL", "curl -fsSI http://localhost:8000/ >/dev/null || exit 1"]
+      test: [ "CMD-SHELL", "curl -fsS http://localhost:8000/api/schema/ >/dev/null || exit 1" ]
       interval: 10s
       timeout: 3s
       retries: 20
     restart: unless-stopped
+
 
   worker:
     build:
