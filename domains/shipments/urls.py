@@ -1,22 +1,22 @@
-# domains/shipments/urls.py  <-- 전체 교체
 from django.urls import path
 from .views import (
-    ShipmentsListAPI,
-    ShipmentDetailAPI,
-    ShipmentSyncAPI,
-    ShipmentWebhookAPI,
-    RegisterShipmentAPI,  # 선택
+    ShipmentsListAPI, ShipmentDetailAPI, ShipmentSyncAPI,
+    ShipmentWebhookAPI, RegisterShipmentAPI
 )
 
-urlpatterns = [
-    # 여기서는 prefix를 전혀 붙이지 않는다. (config에서 api/v1/shipments/로 include됨)
-    path("", ShipmentsListAPI.as_view(), name="shipment-list"),
-    path("<uuid:id>/", ShipmentDetailAPI.as_view(), name="shipment-detail"),
-    path("sync/", ShipmentSyncAPI.as_view(), name="shipment-sync"),
+app_name = "shipments"
 
-    # 임시: /api/v1/shipments/webhooks/<carrier>/ (최종은 /api/v1/webhooks/shipments/<carrier>)
+urlpatterns = [
+    path("", ShipmentsListAPI.as_view(), name="shipment-list"),
+
+    # ✅ 정적 경로들 먼저
+    path("sync/", ShipmentSyncAPI.as_view(), name="shipment-sync"),
+    path("register/", RegisterShipmentAPI.as_view(), name="shipment-register"),
     path("webhooks/<str:carrier>/", ShipmentWebhookAPI.as_view(), name="shipment-webhook"),
 
-    # 선택: 사용자 등록용
-    path("register/", RegisterShipmentAPI.as_view(), name="shipment-register"),
+    # ✅ 그 다음에 동적 경로
+    path("<uuid:id>/", ShipmentDetailAPI.as_view(), name="shipment-detail"),
+
+    # ✅ 제일 마지막: 임시 백업 패턴(문제 원인이던 catch-all이므로 맨 끝)
+    path("<str:id>/",  ShipmentDetailAPI.as_view(), name="shipment-detail-str"),
 ]

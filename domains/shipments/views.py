@@ -126,6 +126,8 @@ class ShipmentWebhookAPI(APIView):
     def post(self, request, carrier: str):
         payload = dict(request.data) if isinstance(request.data, dict) else {}
         payload.setdefault("carrier", carrier)
+        if "tracking_number" not in payload and "invoice_no" in payload:
+            payload["tracking_number"] = payload.pop("invoice_no")
 
         ser = WebhookInSerializer(data=payload)
         ser.is_valid(raise_exception=True)
@@ -154,7 +156,8 @@ class RegisterShipmentAPI(APIView):
         ser.is_valid(raise_exception=True)
 
         purchase_id = ser.validated_data.get("purchase_id")
-        purchase = get_object_or_404(Purchase, purchase_id=purchase_id, user=request.user)
+        purchase = get_object_or_404(Purchase, pk=purchase_id, user=request.user)
+
 
         shipment = register_tracking_with_sweettracker(
             tracking_number=ser.validated_data["tracking_number"],

@@ -15,7 +15,8 @@ inflection==0.5.1
 jsonschema==4.25.1
 jsonschema-specifications==2025.9.1
 oauthlib==3.3.1
-psycopg==3.2.10
+# psycopg: 소스/바이너리 중복 제거 → 바이너리만 유지
+psycopg[binary]==3.2.10
 pycparser==2.23
 pyjwt==2.10.1
 python-dotenv==1.1.1
@@ -39,5 +40,4 @@ whitenoise
 celery[redis]==5.*
 django-celery-results==2.*
 django-celery-beat==2.*
-psycopg[binary]==3.2.10
 Pillow==11.0.0
