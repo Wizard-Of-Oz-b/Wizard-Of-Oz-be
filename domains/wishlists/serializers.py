@@ -3,6 +3,7 @@ from domains.wishlists.models import WishlistItem
 from domains.catalog.models import Product
 from domains.catalog.serializers import ProductImageSlim
 
+
 class WishlistItemReadSerializer(serializers.ModelSerializer):
     wishlist_id  = serializers.UUIDField(read_only=True)
     user_id      = serializers.UUIDField(source="user.id", read_only=True)
@@ -52,3 +53,9 @@ class WishlistItemWriteSerializer(serializers.ModelSerializer):
         if not created and validated.get("options"):
             obj.options = validated["options"]; obj.save(update_fields=["options"])
         return obj
+
+# 수량 입력용 (기본 1)
+
+class MoveToCartRequestSerializer(serializers.Serializer):
+    quantity = serializers.IntegerField(min_value=1, default=1)
+    remove_from_wishlist = serializers.BooleanField(required=False, default=True)
