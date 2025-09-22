@@ -39,4 +39,7 @@ urlpatterns = [
     path("admin/", include(("domains.staff.urls_admin", "staff_admin"))),
     path("", include("domains.wishlists.urls")),
 
+    path("", include("domains.accounts.urls_addresses")),
+    path("", include("domains.orders.urls_shipping")),
+
 ]
