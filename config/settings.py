@@ -265,3 +265,7 @@ CELERY_BEAT_SCHEDULE = {
         "schedule": crontab(minute="*/30"),
     },
 }
+
+SHIPMENTS_NOTIFY_WEBHOOK = os.getenv("SHIPMENTS_NOTIFY_WEBHOOK")
+
+APPEND_SLASH = True
