@@ -2,6 +2,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from .models import User, SocialAccount
+from .models import UserAddress
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
@@ -33,3 +34,10 @@ class UserAdmin(BaseUserAdmin):
 class SocialAccountAdmin(admin.ModelAdmin):
     list_display = ("id", "user", "provider", "provider_uid", "email", "created_at")
     search_fields = ("provider_uid", "email", "user__email")
+
+
+@admin.register(UserAddress)
+class UserAddressAdmin(admin.ModelAdmin):
+    list_display = ("address_id","user","recipient","is_default","is_active","created_at")
+    list_filter = ("is_default","is_active")
+    search_fields = ("user__email","recipient","address1","postcode")

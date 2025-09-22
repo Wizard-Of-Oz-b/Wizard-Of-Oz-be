@@ -156,3 +156,31 @@ class SocialAccount(models.Model):
     def __str__(self) -> str:
         # FK의 raw id 접근은 <fieldname>_id 로 가능 (여기선 user_id)
         return f"{self.provider}:{self.provider_uid} -> {self.user_id}"
+
+
+# ----- AddressBook ------------------------------------------------
+from django.db.models import Q
+
+class UserAddress(models.Model):
+    address_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user       = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="addresses")
+    recipient  = models.CharField(max_length=50)
+    phone      = models.CharField(max_length=20)
+    postcode   = models.CharField(max_length=10)
+    address1   = models.CharField(max_length=200)                 # 도로명/지번
+    address2   = models.CharField(max_length=200, default="", blank=True)  # 상세
+    is_default = models.BooleanField(default=False)
+    is_active  = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "user_addresses"
+        indexes = [models.Index(fields=["user", "-created_at"])]
+        constraints = [
+            # 사용자당 기본배송지 1개만 허용
+            models.UniqueConstraint(fields=["user"], condition=Q(is_default=True), name="uq_user_default_address"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.user_id} / {self.recipient} / {self.address1}"
