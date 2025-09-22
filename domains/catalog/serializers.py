@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 from typing import Iterable, Optional, Any
+from django.conf import settings
+from django.core.exceptions import FieldError
 from rest_framework import serializers
 from drf_spectacular.utils import extend_schema_field
 from .models import Category, Product, ProductStock
@@ -17,6 +19,30 @@ def _abs_url(request, url: Optional[str]) -> Optional[str]:
     if not url:
         return None
     return request.build_absolute_uri(url) if request else url
+
+
+def _resolve_image_url(img: Any) -> Optional[str]:
+    """
+    ProductImage 인스턴스에서 실제 표시 가능한 URL을 뽑아낸다.
+    - remote_url(문자열)이 있으면 우선 사용
+    - ImageField/FileField('image')가 있으면 .url 사용
+    - 둘 다 없으면 None
+    ※ 필드명이 다르면 여기서만 보완하면 됨.
+    """
+    # 1) remote_url 우선
+    remote = getattr(img, "remote_url", None)
+    if isinstance(remote, str) and remote.strip():
+        return remote.strip()
+
+    # 2) ImageField/FileField
+    f = getattr(img, "image", None)
+    if f:
+        try:
+            return getattr(f, "url", None)
+        except Exception:
+            return None
+
+    return None
 
 
 # =========================
@@ -52,11 +78,10 @@ class ProductImageSlim(serializers.Serializer):
     @staticmethod
     def from_instance(img: Any, request=None) -> dict:
         """
-        일반적으로 ImageField 이름이 'image'라고 가정.
-        필드명이 다르면 여기만 수정하면 됨.
+        일반적으로 ImageField 이름이 'image', 원격은 'remote_url'이라 가정.
+        필드명이 다르면 _resolve_image_url 만 조정하면 됨.
         """
-        image_field = getattr(img, "image", None)
-        raw_url = getattr(image_field, "url", None) if image_field else None
+        raw_url = _resolve_image_url(img)
         return {
             "id": str(getattr(img, "pk", getattr(img, "id", ""))),
             "url": _abs_url(request, raw_url),  # 없으면 None
@@ -69,8 +94,7 @@ class ProductImageSlim(serializers.Serializer):
 class ProductReadSerializer(serializers.ModelSerializer):
     product_id = serializers.UUIDField(source="id", read_only=True)
 
-    # Django는 FK에 대해 <field>_id 속성을 자동으로 제공합니다.
-    # source 지정 없이 read_only로 두면 모델의 category_id 값을 그대로 읽습니다.
+    # Django는 FK에 대해 <field>_id 속성을 자동 제공한다.
     category_id = serializers.UUIDField(read_only=True)
     category_name = serializers.CharField(source="category.name", read_only=True)
 
@@ -92,32 +116,41 @@ class ProductReadSerializer(serializers.ModelSerializer):
             "options",
             "category_id",    # 읽기 전용 FK id
             "category_name",  # 읽기 전용 FK name
-            "primary_image",  # 대표 이미지(첫 번째 유효 url)
+            "primary_image",  # 대표 이미지(유효 url)
             "images",         # 모든 이미지(슬림)
             "created_at",
             "updated_at",
         )
-        read_only_fields = (
-            "product_id",
-            "category_id",
-            "category_name",
-            "primary_image",
-            "images",
-            "created_at",
-            "updated_at",
-        )
+    # read_only_fields는 fields로 충분하니 생략해도 무방(남겨도 OK)
 
     # --- 이미지 헬퍼 ---
     def _iter_product_images(self, obj: Product) -> Iterable:
         """
         related_name이 'images' 또는 기본 'productimage_set' 둘 다 지원.
-        없다면 빈 리스트.
+        가급적 대표/정렬을 고려한 순서로 반환한다.
+        우선순위: is_main DESC → display_order ASC → created_at ASC
         """
+        rel = None
         if hasattr(obj, "images"):
-            return getattr(obj, "images").all()
-        if hasattr(obj, "productimage_set"):
-            return getattr(obj, "productimage_set").all()
-        return []
+            rel = getattr(obj, "images")
+        elif hasattr(obj, "productimage_set"):
+            rel = getattr(obj, "productimage_set")
+        if rel is None:
+            return []
+
+        qs = rel.all()
+        try:
+            qs = qs.order_by("-is_main", "display_order", "created_at")
+        except FieldError:
+            # 일부 필드가 없으면 가능한 범위에서만 정렬
+            try:
+                qs = qs.order_by("-is_main", "created_at")
+            except FieldError:
+                try:
+                    qs = qs.order_by("created_at")
+                except FieldError:
+                    pass
+        return qs
 
     @extend_schema_field(ProductImageSlim(many=True))
     def get_images(self, obj: Product):
@@ -128,12 +161,29 @@ class ProductReadSerializer(serializers.ModelSerializer):
     @extend_schema_field(ProductImageSlim)  # nullable object
     def get_primary_image(self, obj: Product):
         """
-        url이 있는 첫 이미지를 대표로 선택. 하나도 없으면 None.
+        url이 있는 첫 이미지를 대표로 선택.
+        - 원격 URL 또는 파일 URL을 모두 지원(_resolve_image_url)
+        - 하나도 없으면:
+          1) settings.DEFAULT_PRODUCT_PLACEHOLDER_URL 이 있으면 그것으로 채움
+          2) 없으면 None
         """
-        all_images = self.get_images(obj)
-        for item in all_images:
-            if item.get("url"):  # None/빈 문자열이 아닌 첫 url
-                return item
+        request = self.context.get("request")
+
+        # 1) 유효 URL이 있는 첫 이미지 선택
+        for img in self._iter_product_images(obj):
+            url = _abs_url(request, _resolve_image_url(img))
+            if url:
+                return {
+                    "id": str(getattr(img, "pk", getattr(img, "id", ""))),
+                    "url": url,
+                }
+
+        # 2) 플레이스홀더(선택) — "항상 채우기"가 필요하면 settings 에 값만 넣으면 됨
+        placeholder = getattr(settings, "DEFAULT_PRODUCT_PLACEHOLDER_URL", None)
+        if placeholder:
+            return {"id": None, "url": _abs_url(request, placeholder)}
+
+        # 3) 정말 없으면 None
         return None
 
 
