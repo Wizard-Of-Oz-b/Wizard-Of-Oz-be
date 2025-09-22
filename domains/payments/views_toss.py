@@ -1,246 +1,222 @@
 # domains/payments/views_toss.py
-import hmac
-import hashlib
-import base64
-import json
-import requests
+from __future__ import annotations
 
-from django.conf import settings
+from decimal import Decimal
 from django.shortcuts import get_object_or_404
-from rest_framework import permissions, status
+from django.db import transaction
+from django.utils import timezone
+from rest_framework import permissions, status, views
 from rest_framework.response import Response
-from rest_framework.views import APIView
-from drf_spectacular.utils import extend_schema, OpenApiResponse
+from drf_spectacular.utils import extend_schema
 
-from domains.orders.models import Purchase
-from domains.payments.serializers_toss import (
-    TossConfirmRequestSerializer,
-    TossCancelRequestSerializer,
-)
-from rest_framework.views import APIView
-from rest_framework.permissions import AllowAny
-from rest_framework.response import Response
-from drf_spectacular.utils import extend_schema, OpenApiTypes
+from .models import Payment, PaymentEvent, PaymentStatus, CancelStatus
+from .serializers import PaymentReadSerializer, PaymentCancelRequestSerializer
+from .serializers_toss import TossConfirmRequestSerializer
+from .toss_client import confirm as toss_confirm, retrieve_by_key, cancel as toss_cancel
+from domains.orders.models import PurchaseStatus  # 주문 헤더 상태 동기화용
 
-TOSS_SECRET_KEY = getattr(settings, "TOSS_SECRET_KEY", "")
-TOSS_CLIENT_KEY = getattr(settings, "TOSS_CLIENT_KEY", "")
-
-# ---------------------------------------------------------------------
-# 유틸: 모델에 존재하는 필드만 안전하게 저장
-# ---------------------------------------------------------------------
-def _purchase_model_fields():
-    return {
-        f.name
-        for f in Purchase._meta.get_fields()
-        if getattr(f, "concrete", False) and not getattr(f, "many_to_many", False)
-    }
+from domains.carts.models import CartItem
+from domains.orders.services import create_order_items_from_cart   # ← 추가
+from domains.catalog.services import OutOfStockError, StockRowMissing  # ← 추가
 
 
-def _assign_and_save_purchase(purchase, *, status_value, pg_value=None, pg_tid_value=None):
-    fields = _purchase_model_fields()
-    update_fields = []
-
-    # status는 있다고 가정
-    purchase.status = status_value
-    update_fields.append("status")
-
-    if "pg" in fields and pg_value is not None:
-        purchase.pg = pg_value
-        update_fields.append("pg")
-
-    if "pg_tid" in fields and pg_tid_value is not None:
-        purchase.pg_tid = pg_tid_value
-        update_fields.append("pg_tid")
-
-    purchase.save(update_fields=update_fields)
-
-
-# ---------------------------------------------------------------------
-# 프론트에 Toss clientKey 내려주기
-# ---------------------------------------------------------------------
-class TossClientKeyAPI(APIView):
+# ─────────────────────────────────────────────────────────────────────────────
+# 승인(Confirm): paymentKey, orderId(=Payment.order_number), amount
+# ─────────────────────────────────────────────────────────────────────────────
+class TossConfirmAPI(views.APIView):
     permission_classes = [permissions.AllowAny]
 
     @extend_schema(
-        operation_id="GetTossClientKey",
-        responses={200: {
-            "type": "object",
-            "properties": {"clientKey": {"type": "string"}},
-            "required": ["clientKey"],
-        }},
-        tags=["Payments"],
-    )
-    def get(self, request):
-        return Response({"clientKey": TOSS_CLIENT_KEY})
-
-
-# ---------------------------------------------------------------------
-# 결제 승인(Confirm) - successUrl에서 받은 값을 서버로 전달해 승인 처리
-#   - orderId: 숫자 PK(purchase_id) 사용 권장
-#   - PG_FAKE_MODE=1 이면 실제 호출 없이 바로 paid 처리
-# ---------------------------------------------------------------------
-class TossConfirmAPI(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    @extend_schema(
+        operation_id="TossConfirm",
         request=TossConfirmRequestSerializer,
-        responses={
-            200: OpenApiResponse(description="결제 승인 성공"),
-            400: OpenApiResponse(description="승인 실패"),
-        },
+        responses={200: PaymentReadSerializer, 400: dict, 404: dict},
     )
+    @transaction.atomic
     def post(self, request):
-        payment_key = request.data.get("paymentKey")
-        order_id_in = request.data.get("orderId")  # 예: "5" (purchase_id)
-        amount_in = request.data.get("amount")
+        ser = TossConfirmRequestSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        payment_key: str = ser.validated_data["paymentKey"]
+        order_id: str = ser.validated_data["orderId"]          # = Payment.order_number
+        amount: Decimal = ser.validated_data["amount"]
 
-        if not all([payment_key, order_id_in, amount_in]):
+        # 1) 스텁 조회 & 락
+        payment = (
+            Payment.objects.select_for_update()
+            .filter(order_number=order_id)
+            .first()
+        )
+        if not payment:
+            return Response({"detail": "payment stub not found (order_number)"}, status=404)
+
+        # 2) 중복 컨펌 방지
+        if payment.status == PaymentStatus.PAID:
+            return Response({"detail": "already confirmed"}, status=400)
+
+        # 3) 금액 일치 검증(있다면)
+        if payment.amount_total and Decimal(str(payment.amount_total)) != Decimal(str(amount)):
             return Response(
-                {"detail": "paymentKey, orderId, amount required"},
-                status=status.HTTP_400_BAD_REQUEST,
+                {"detail": "amount mismatch", "expected": str(payment.amount_total), "got": str(amount)},
+                status=400,
             )
 
-        # 구매 조회: 숫자면 PK(purchase_id)로 조회
-        if not str(order_id_in).isdigit():
-            return Response(
-                {"detail": "orderId must be numeric purchase_id"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        purchase = get_object_or_404(Purchase, pk=int(order_id_in), user=request.user)
+        # 4) Toss confirm 호출
+        data = toss_confirm(payment_key, order_id, amount)
 
-        # 금액 검증
+        # 5) Payment 상태/스냅샷 반영
+        provider_done = (data.get("status") == "DONE")
+        payment.provider_payment_key = data.get("paymentKey") or payment.provider_payment_key
+        payment.method = (data.get("method") or "").lower() or payment.method
+        if provider_done:
+            payment.status = PaymentStatus.PAID
+        payment.amount_total = data.get("totalAmount") or payment.amount_total
+        payment.vat = data.get("vat") or payment.vat or 0
+        payment.approved_at = timezone.now()
+        payment.receipt_url = (data.get("receipt") or {}).get("url") or payment.receipt_url
+        payment.card_info = data.get("card") or payment.card_info
+        payment.easy_pay = data.get("easyPay") or payment.easy_pay
+        payment.touch()
+        payment.save()
+        # ✅ 승인 성공 시점에 OrderItem 생성(+재고 차감, 카트 비우기)
+        if provider_done:
+            try:
+                created = create_order_items_from_cart(payment.order)
+            except (OutOfStockError, StockRowMissing) as e:
+                return Response({"detail": str(e)}, status=409)
+
+        # 6) 이벤트 로그
+        PaymentEvent.objects.create(
+            payment=payment,
+            source="api",
+            event_type="approval",
+            provider_status=payment.status,
+            payload=data,
+            occurred_at=timezone.now(),
+        )
+
+        # 7) 주문 헤더 상태 동기화 (ready -> paid)
         try:
-            req_amount = int(amount_in)
-        except (TypeError, ValueError):
-            return Response(
-                {"detail": "amount must be integer"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        if req_amount != int(purchase.amount):
-            return Response(
-                {"detail": "amount mismatch"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        if purchase.status == "paid":
-            return Response({"detail": "already paid"}, status=status.HTTP_409_CONFLICT)
+            order = payment.order  # FK: Payment -> Purchase
+        except Exception:
+            order = None
+        if order and order.status != PurchaseStatus.PAID:
+            order.status = PurchaseStatus.PAID
+            order.save(update_fields=["status"])
 
-        # 실제 Toss 승인 호출
-        try:
-            r = requests.post(
-                "https://api.tosspayments.com/v1/payments/confirm",
-                auth=(TOSS_SECRET_KEY, ""),  # Basic auth: <secretKey>:
-                json={"paymentKey": payment_key, "orderId": str(order_id_in), "amount": req_amount},
-                timeout=10,
-            )
-            data = r.json()
-        except requests.RequestException as e:
-            return Response(
-                {"ok": False, "error": {"message": str(e)}},
-                status=status.HTTP_502_BAD_GATEWAY,
-            )
+            # (선택) 결제 성공 시 장바구니 비우기: 유저 기준으로 비움
+            CartItem.objects.filter(cart__user=order.user).delete()
 
-        if r.status_code == 200:
-            _assign_and_save_purchase(
-                purchase,
-                status_value="paid",
-                pg_value="toss",
-                pg_tid_value=data.get("paymentKey"),
-            )
-            return Response({"ok": True, "payment": data}, status=status.HTTP_200_OK)
-
-        return Response({"ok": False, "error": data}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(PaymentReadSerializer(payment).data, status=status.HTTP_200_OK)
 
 
-
-
-
-# ---------------------------------------------------------------------
-# 취소/환불 (운영에선 관리자 권한으로 보호 권장)
-#   - PG_FAKE_MODE=1 이면 로컬에서 상태만 변경하여 에뮬레이션
-#   - 실제 취소는 구매에 pg_tid가 저장되어 있을 때만 가능
-# ---------------------------------------------------------------------
-class TossCancelAPI(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    @extend_schema(
-        request=TossCancelRequestSerializer,
-        responses={
-            200: OpenApiResponse(description="취소/환불 성공"),
-            400: OpenApiResponse(description="취소/환불 실패"),
-        },
-    )
-    def post(self, request):
-        purchase_id = request.data.get("purchase_id")
-        cancel_reason = request.data.get("cancel_reason") or "requested by user"
-        amount = request.data.get("amount")  # 부분 환불 시 정수
-
-        if not purchase_id:
-            return Response({"detail": "purchase_id required"}, status=status.HTTP_400_BAD_REQUEST)
-        purchase = get_object_or_404(Purchase, pk=int(purchase_id), user=request.user)
-
-
-
-        fields = _purchase_model_fields()
-        pg_tid = getattr(purchase, "pg_tid", None) if "pg_tid" in fields else None
-        if not pg_tid:
-            return Response(
-                {"detail": "Payment key (pg_tid) not stored. Cannot cancel."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        url = f"https://api.tosspayments.com/v1/payments/{pg_tid}/cancel"
-        payload = {"cancelReason": cancel_reason}
-        if amount:
-            payload["cancelAmount"] = int(amount)
-
-        try:
-            r = requests.post(url, auth=(TOSS_SECRET_KEY, ""), json=payload, timeout=10)
-            data = r.json()
-        except requests.RequestException as e:
-            return Response({"ok": False, "error": {"message": str(e)}}, status=status.HTTP_502_BAD_GATEWAY)
-
-        if r.status_code == 200:
-            new_status = "refunded" if amount else "canceled"
-            _assign_and_save_purchase(purchase, status_value=new_status)
-            return Response({"ok": True, "payment": data}, status=status.HTTP_200_OK)
-
-        return Response({"ok": False, "error": data}, status=status.HTTP_400_BAD_REQUEST)
-
-
-# ---------------------------------------------------------------------
-# 웹훅(선택): 가상계좌 등 비동기 이벤트 처리
-# ---------------------------------------------------------------------
-class TossWebhookAPI(APIView):
-    """
-    토스 대시보드에서 웹훅 URL로 설정.
-    헤더 'Toss-Signature' 검증(HMAC-SHA256 with secretKey)
-    """
+# ─────────────────────────────────────────────────────────────────────────────
+# 조회: payment_id로 조회
+# ─────────────────────────────────────────────────────────────────────────────
+class PaymentRetrieveAPI(views.APIView):
     permission_classes = [permissions.AllowAny]
 
+    @extend_schema(operation_id="PaymentRetrieve", responses={200: PaymentReadSerializer, 404: dict})
+    def get(self, request, payment_id):
+        payment = get_object_or_404(Payment, pk=payment_id)
+        return Response(PaymentReadSerializer(payment).data)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 싱크: Toss 최신 상태 반영
+# ─────────────────────────────────────────────────────────────────────────────
+class TossSyncAPI(views.APIView):
+    permission_classes = [permissions.IsAdminUser]
+
+    @extend_schema(operation_id="TossSync", responses={200: PaymentReadSerializer, 400: dict, 404: dict})
+    @transaction.atomic
+    def post(self, request, payment_id):
+        payment = get_object_or_404(Payment, pk=payment_id)
+        if not payment.provider_payment_key:
+            return Response({"detail": "provider_payment_key is empty"}, status=400)
+
+        data = retrieve_by_key(payment.provider_payment_key)
+
+        toss_status = data.get("status")
+        if toss_status == "DONE":
+            payment.status = PaymentStatus.PAID
+        elif toss_status == "CANCELED":
+            payment.status = PaymentStatus.CANCELED
+        # 필요 시 추가 매핑
+
+        payment.last_synced_at = timezone.now()
+        payment.touch()
+        payment.save()
+
+        PaymentEvent.objects.create(
+            payment=payment,
+            source="sync",
+            event_type="status_changed",
+            provider_status=payment.status,
+            payload=data,
+            occurred_at=timezone.now(),
+        )
+        return Response(PaymentReadSerializer(payment).data)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 취소(부분/전액)
+# ─────────────────────────────────────────────────────────────────────────────
+class TossCancelAPI(views.APIView):
+    permission_classes = [permissions.IsAdminUser]
+
     @extend_schema(
-        operation_id="TossWebhook",
-        request={"application/json": {
-            "type": "object",
-            "properties": {
-                "orderId": {"type": "string"},
-                "paymentKey": {"type": "string"},
-                "status": {"type": "string"},
-            },
-            "required": ["orderId", "paymentKey", "status"],
-        }},
-        responses={200: OpenApiTypes.OBJECT},  # 혹은 {204: None}
-        tags=["Payments"],
+        operation_id="TossCancel",
+        request=PaymentCancelRequestSerializer,
+        responses={200: PaymentReadSerializer, 400: dict, 404: dict},
     )
+    @transaction.atomic
+    def post(self, request, payment_id):
+        payment = get_object_or_404(Payment, pk=payment_id)
+        if not payment.provider_payment_key:
+            return Response({"detail": "provider_payment_key is empty"}, status=400)
 
-    def post(self, request):
-        body = request.body  # bytes
-        signature = request.headers.get("Toss-Signature")
+        ser = PaymentCancelRequestSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        cancel = ser.save(payment=payment, status=CancelStatus.REQUESTED)
 
-        mac = hmac.new(TOSS_SECRET_KEY.encode(), body, hashlib.sha256).digest()
-        expected = base64.b64encode(mac).decode()
+        data = toss_cancel(
+            payment_key=payment.provider_payment_key,
+            amount=cancel.cancel_amount,
+            reason=cancel.reason or "cancel by admin",
+            tax_free_amount=cancel.tax_free_amount or 0,
+        )
 
-        if signature != expected:
-            return Response({"detail": "invalid signature"}, status=status.HTTP_401_UNAUTHORIZED)
+        # Payment 반영
+        is_partial = data.get("status") == "PARTIAL_CANCELED"
+        payment.status = PaymentStatus.PARTIAL_CANCELED if is_partial else PaymentStatus.CANCELED
+        payment.canceled_at = timezone.now()
+        payment.touch()
+        payment.save()
 
-        event = json.loads(body.decode("utf-8"))
-        return Response({"ok": True}, status=status.HTTP_200_OK)
+        # 이벤트 로그
+        cancel.status = CancelStatus.DONE
+        cancel.approved_at = timezone.now()
+        cancel.save()
+
+        PaymentEvent.objects.create(
+            payment=payment,
+            source="api",
+            event_type="cancel",
+            provider_status=payment.status,
+            payload=data,
+            occurred_at=timezone.now(),
+        )
+
+        # 주문 헤더 상태 동기화: 전액 취소일 때만 canceled 로 전환
+        try:
+            order = payment.order
+        except Exception:
+            order = None
+        if order:
+            total = Decimal(str(payment.amount_total or 0))
+            canceled_amt = Decimal(str(cancel.cancel_amount or 0))
+            if canceled_amt >= total and order.status != PurchaseStatus.CANCELED:
+                order.status = PurchaseStatus.CANCELED
+                order.save(update_fields=["status"])
+            # 부분취소는 정책상 헤더 유지(필요 시 별도 상태 추가)
+
+        return Response(PaymentReadSerializer(payment).data, status=200)

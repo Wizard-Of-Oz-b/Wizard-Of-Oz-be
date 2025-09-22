@@ -35,7 +35,7 @@ class ShipmentSerializer(serializers.ModelSerializer):
 # validate에서 carrier 로 정규화
 # ---------------------------
 class RegisterShipmentSerializer(serializers.Serializer):
-    purchase_id = serializers.IntegerField()
+    purchase_id = serializers.UUIDField()
     tracking_number = serializers.CharField(max_length=64)
     carrier = serializers.CharField(required=False, allow_blank=True)
     carrier_code = serializers.CharField(required=False, allow_blank=True)

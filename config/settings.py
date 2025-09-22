@@ -52,6 +52,8 @@ INSTALLED_APPS = [
     "domains.orders",
     "domains.shipments",
     "domains.carts",
+    "domains.payments",
+    "domains.wishlists",
 ]
 
 AUTH_USER_MODEL = "accounts.User"
@@ -138,12 +140,17 @@ STORAGES = {
 
 # DRF & OpenAPI
 REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": (
+    "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework_simplejwt.authentication.JWTAuthentication",
-    ),
-    "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.AllowAny",),
+        # 필요 시 "rest_framework.authentication.SessionAuthentication"
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.AllowAny",
+    ],
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
-    "DEFAULT_FILTER_BACKENDS": ("django_filters.rest_framework.DjangoFilterBackend",),
+    "DEFAULT_FILTER_BACKENDS": [
+        "django_filters.rest_framework.DjangoFilterBackend",
+    ],
 }
 
 
@@ -175,25 +182,10 @@ SPECTACULAR_SETTINGS = {
     },
 }
 
-
-
-
-
-
-REST_FRAMEWORK.update({
-    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
-    "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
-        # 필요시 SessionAuth 등 추가
-    ],
-})
-
-
-
 # ──────────────────────────────────────────────────────────────────────────────
 # JWT (SimpleJWT)
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=int(os.getenv("ACCESS_MIN", "15"))),
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=int(os.getenv("ACCESS_MIN", "60"))),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=int(os.getenv("REFRESH_DAYS", "7"))),
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
@@ -275,3 +267,7 @@ CELERY_BEAT_SCHEDULE = {
         "schedule": crontab(minute="*/30"),
     },
 }
+
+SHIPMENTS_NOTIFY_WEBHOOK = os.getenv("SHIPMENTS_NOTIFY_WEBHOOK")
+
+APPEND_SLASH = True

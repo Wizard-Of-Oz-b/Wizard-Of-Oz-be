@@ -37,4 +37,6 @@ urlpatterns = [
     # --- Admin (관리자 API) ---
     # 여기 안에 users/categories/products/product-stocks/product-images/orders 등이 라우터로 등록됨
     path("admin/", include(("domains.staff.urls_admin", "staff_admin"))),
+    path("", include("domains.wishlists.urls")),
+
 ]
