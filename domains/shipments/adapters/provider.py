@@ -1,39 +1,28 @@
-# domains/shipments/adapters/provider.py
-import hashlib, hmac, json
-from typing import Dict, Iterable
-from .base import CarrierAdapter
-from ..status_map import map_provider_status
-from django.utils.dateparse import parse_datetime
+from __future__ import annotations
+from typing import Dict, Type
+from .base import BaseAdapter
 
-class DTAdapter(CarrierAdapter):
-    provider = "DT"
+# 어댑터 레지스트리
+_REGISTRY: Dict[str, Type[BaseAdapter]] = {}
 
-    def fetch_tracking(self, tracking_number: str) -> Dict[str, any]:
-        # requests.get(...) 호출부 (timeout, retry는 세션에서 관리)
-        # 여기서는 스켈레톤만:
-        return {"tracking_number": tracking_number, "events": []}
+def _norm(code: str) -> str:
+    return (code or "").strip().lower().replace("-", "_").replace(" ", "")
 
-    def normalize_events(self, payload: Dict[str, any]) -> Iterable[Dict[str, any]]:
-        events = payload.get("events", [])
-        for ev in events:
-            internal = map_provider_status(ev.get("status"))
-            occurred = parse_datetime(ev.get("time"))  # "2025-09-16T04:20:00Z" 등
-            yield {
-                "occurred_at": occurred,
-                "status": internal,
-                "location": ev.get("location") or "",
-                "description": ev.get("description") or "",
-                "provider_code": ev.get("status"),
-                "raw": ev,
-                "dedupe_key": f"DT:{payload.get('tracking_number')}:{ev.get('id') or ev.get('time')}",
-            }
+# 흔한 별칭 → 표준 코드
+_ALIASES = {
+    "cj": "kr.cjlogistics",
+    "cjlogistics": "kr.cjlogistics",
+    "sweettracker": "kr.cjlogistics",  # 데모/중계사 명칭을 같은 어댑터로 묶기
+}
 
-    def verify_webhook(self, request) -> bool:
-        sig = request.headers.get("X-Provider-Signature")
-        secret = (getattr(request, "webhook_secret", None)  # 주입 or settings
-                  or "")
-        mac = hmac.new(secret.encode(), request.body, hashlib.sha256).hexdigest()
-        return hmac.compare_digest(sig or "", mac)
+def register_adapter(code: str, adapter_cls: Type[BaseAdapter]) -> None:
+    """캐리어 코드(별칭 포함)에 어댑터 클래스를 등록."""
+    _REGISTRY[_norm(code)] = adapter_cls
 
-    def parse_webhook(self, request) -> Dict[str, any]:
-        return json.loads(request.body.decode("utf-8"))
+def get_adapter(code: str) -> BaseAdapter:
+    """캐리어 코드/별칭으로 어댑터 인스턴스를 반환."""
+    key = _norm(_ALIASES.get(_norm(code), code))
+    cls = _REGISTRY.get(key)
+    if not cls:
+        raise ImportError(f"No adapter registered for carrier '{code}' (key='{key}')")
+    return cls()

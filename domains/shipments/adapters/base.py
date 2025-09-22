@@ -1,26 +1,28 @@
 # domains/shipments/adapters/base.py
-from abc import ABC, abstractmethod
-from typing import Dict, Iterable, Any
+from typing import Any, Dict, List
 
-class CarrierAdapter(ABC):
-    provider: str  # "DT" 등 내부 식별자
+class CarrierAdapter:
+    """
+    각 택배사 어댑터의 최소 공통 인터페이스
+    """
 
-    @abstractmethod
+    def register_tracking(self, *, tracking_number: str, carrier: str, fid: str) -> None:
+        """
+        (옵션) 외부 서비스에 트래킹 번호를 등록해야 할 때 사용.
+        기본 구현은 no-op.
+        """
+        return None
+
     def fetch_tracking(self, tracking_number: str) -> Dict[str, Any]:
-        """원격 API 호출, provider 원본 JSON 반환"""
-
-    @abstractmethod
-    def normalize_events(self, payload: Dict[str, Any]) -> Iterable[Dict[str, Any]]:
         """
-        원본 → 내부 표준 이벤트 변환
-        return: [{occurred_at: dt, status: 'in_transit', location: str, description: str,
-                  provider_code: str, raw: dict, dedupe_key: str}]
+        (옵션) 외부 조회 API에서 원본 payload를 가져오는 함수.
+        테스트/더미 기본 구현은 이벤트 없음.
         """
+        return {"tracking_number": tracking_number, "events": []}
 
-    @abstractmethod
-    def verify_webhook(self, request) -> bool:
-        """웹훅 서명 검증"""
-
-    @abstractmethod
-    def parse_webhook(self, request) -> Dict[str, Any]:
-        """웹훅 바디 파싱 → fetch_tracking과 동일 스키마로 맞춰 반환(또는 events 중심)"""
+    def parse_events(self, raw: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        외부 원본 payload(raw) → 내부 공통 스키마(events)로 변환.
+        기본 구현은 이미 표준 스키마라고 가정하고 그대로 반환.
+        """
+        return raw.get("events") or []
