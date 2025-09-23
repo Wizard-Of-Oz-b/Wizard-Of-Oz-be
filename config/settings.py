@@ -53,6 +53,8 @@ INSTALLED_APPS = [
     "domains.orders",
     "domains.shipments",
     "domains.carts",
+    "domains.payments",
+    "domains.wishlists",
 ]
 
 AUTH_USER_MODEL = "accounts.User"
@@ -103,14 +105,25 @@ def env_multi(*keys, default=None):
             return v
     return default
 
+# DATABASES = {
+#     "default": {
+#         "ENGINE": "django.db.backends.postgresql",
+#         "NAME": env_multi("DB_NAME", "POSTGRES_DB", default="shopapi"),
+#         "USER": env_multi("DB_USER", "POSTGRES_USER", default="postgres"),
+#         "PASSWORD": env_multi("DB_PASSWORD", "POSTGRES_PASSWORD", default=""),
+#         "HOST": env_multi("DB_HOST", "POSTGRES_HOST", default="db"),
+#         "PORT": env_multi("DB_PORT", "POSTGRES_PORT", default="5432"),
+#     }
+# }
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": env_multi("DB_NAME", "POSTGRES_DB", default="shopapi"),
-        "USER": env_multi("DB_USER", "POSTGRES_USER", default="postgres"),
-        "PASSWORD": env_multi("DB_PASSWORD", "POSTGRES_PASSWORD", default=""),
-        "HOST": env_multi("DB_HOST", "POSTGRES_HOST", default="db"),
-        "PORT": env_multi("DB_PORT", "POSTGRES_PORT", default="5432"),
+        "HOST": os.getenv("DB_HOST", "localhost"),
+        "PORT": os.getenv("DB_PORT", "5432"),
+        "NAME": os.getenv("DB_NAME", "django"),
+        "USER": os.getenv("DB_USER", "postgres"),
+        "PASSWORD": os.getenv("DB_PASSWORD", "postgres"),
     }
 }
 
@@ -267,3 +280,10 @@ CELERY_BEAT_SCHEDULE = {
         # "options": {"queue": "celery"},
     },
 }
+
+
+DEFAULT_PRODUCT_PLACEHOLDER_URL = "/static/img/product_placeholder.png"
+
+SHIPMENTS_NOTIFY_WEBHOOK = os.getenv("SHIPMENTS_NOTIFY_WEBHOOK")
+
+APPEND_SLASH = True

@@ -1,7 +1,6 @@
 # domains/carts/serializers.py
 from __future__ import annotations
 
-from decimal import Decimal
 from typing import Dict, Any
 
 from rest_framework import serializers
@@ -29,21 +28,52 @@ def _validate_option_key_value(v: str) -> str:
 # Read serializers
 # ---------------------------
 class CartItemSerializer(serializers.ModelSerializer):
+    """장바구니 아이템 읽기용 직렬화기 (상품 썸네일 포함)"""
     product_name = serializers.CharField(source="product.name", read_only=True)
+    image_url = serializers.SerializerMethodField()
 
     class Meta:
         model = CartItem
         fields = (
             "id",
-            "product",
+            "product",        # UUID(pk)
             "product_name",
             "option_key",
             "options",
             "quantity",
             "unit_price",
+            "image_url",      # 👈 추가: 대표 이미지 URL
             "added_at",
         )
-        read_only_fields = ("id", "option_key", "added_at")
+        read_only_fields = (
+            "id",
+            "option_key",
+            "added_at",
+            "image_url",
+            "product_name",
+        )
+
+    def get_image_url(self, obj) -> str | None:
+        """
+        대표 이미지 선택 규칙:
+        1) Product.thumbnail_url 필드가 있으면 그 값을 사용
+        2) Product.images (related_name='images')가 있으면 첫 번째 이미지의 image_url 사용
+        3) 없으면 None
+        """
+        # 1) 직접 필드 우선
+        url = getattr(obj.product, "thumbnail_url", None)
+        if url:
+            return url
+
+        # 2) 관련 이미지가 프리패치 되어 있다면 첫 번째를 사용
+        images = getattr(obj.product, "images", None)
+        # images가 RelatedManager면 .all() 호출 가능
+        if images is not None and hasattr(images, "all"):
+            first = next(iter(images.all()), None)
+            if first is not None:
+                return getattr(first, "image_url", None)
+
+        return None
 
 
 class CartSerializer(serializers.ModelSerializer):
@@ -136,6 +166,6 @@ class AddCartItemSerializer(serializers.Serializer):
         )
         return item
 
-    # 응답은 읽기용 serializer로 통일
+    # 응답은 읽기용 serializer로 통일(이미지 포함)
     def to_representation(self, instance: CartItem) -> Dict[str, Any]:
         return CartItemSerializer(instance).data

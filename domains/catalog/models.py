@@ -179,12 +179,8 @@ class ProductStock(models.Model):
         related_name="stocks",
         db_column="product_id",
     )
-    option_key = models.CharField(
-        max_length=64,
-        help_text="예: size=L&color=red",
-        db_index=True,
-    )
-    options = models.JSONField(default=dict, blank=True)  # 표시/검증용 옵션 스냅샷
+    option_key = models.CharField(max_length=64, blank=True, default="")
+    options    = models.JSONField(blank=True, default=dict)    # 표시/검증용 옵션 스냅샷
     stock_quantity = models.IntegerField(default=0)
 
     created_at = models.DateTimeField(auto_now_add=True)
