@@ -63,6 +63,14 @@ class Purchase(models.Model):
     items_total = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
     grand_total = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
 
+    # --- 배송지 스냅샷 (주문 시점 복사본; 이후 주소 변경이 과거 주문에 영향 X) ---
+    shipping_recipient = models.CharField(max_length=50, blank=True, default="")
+    shipping_phone     = models.CharField(max_length=20, blank=True, default="")
+    shipping_postcode  = models.CharField(max_length=10, blank=True, default="")
+    shipping_address1  = models.CharField(max_length=200, blank=True, default="")
+    shipping_address2  = models.CharField(max_length=200, blank=True, default="")
+    shipping_memo      = models.CharField(max_length=200, blank=True, default="")
+
     status = models.CharField(
         max_length=20,
         choices=PurchaseStatus.choices,

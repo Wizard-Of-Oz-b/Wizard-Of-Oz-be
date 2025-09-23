@@ -1,6 +1,6 @@
 # domains/orders/admin.py
-from .models import Purchase, PurchaseStatus, OrderItem
 from django.contrib import admin
+from .models import Purchase, OrderItem
 
 
 @admin.register(Purchase)
@@ -26,10 +26,20 @@ class PurchaseAdmin(admin.ModelAdmin):
         "pg_tid",
     )
     ordering = ("-purchased_at",)
-    readonly_fields = ()  # 필요하면 ("purchased_at",) 등 추가
+    # 필요 시 읽기전용 필드를 추가하세요.
+    # readonly_fields = ("purchased_at",)
 
 
 @admin.register(OrderItem)
 class OrderItemAdmin(admin.ModelAdmin):
-    list_display = ("item_id", "order", "product", "option_key", "quantity", "unit_price", "created_at")
-
+    list_display = (
+        "item_id",
+        "order",
+        "product",
+        "option_key",
+        "quantity",
+        "unit_price",
+        "created_at",
+    )
+    search_fields = ("order__purchase_id", "product__name")
+    ordering = ("-created_at",)
