@@ -1,3 +1,5 @@
+version: "3.9"
+
 services:
   db:
     image: postgres:16
@@ -8,7 +10,7 @@ services:
     volumes:
       - dbdata:/var/lib/postgresql/data
     ports:
-      - "5433:5432"   # host 5433 -> container 5432
+      - "5433:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U shop -d shopapi"]
       interval: 5s
@@ -18,7 +20,6 @@ services:
 
   redis:
     image: redis:7
-    # 내부 통신만 쓰면 ports 생략 가능하지만, 디버깅 편의상 노출
     ports:
       - "6379:6379"
     healthcheck:
@@ -34,24 +35,26 @@ services:
       args:
         APP_UID: "${UID:-1000}"
         APP_GID: "${GID:-1000}"
-    env_file: .env.docker
+    env_file: .env.docker           # 개발용 env 값 사용
     depends_on:
       db: { condition: service_healthy }
       redis: { condition: service_healthy }
     ports:
       - "8000:8000"
     user: "${UID:-1000}:${GID:-1000}"
-    entrypoint: [ "/app/entrypoint.sh" ]             # ★ 배시 인용문제 제거
-    command: [ ]                                    # (ENTRYPOINT에서 gunicorn 실행)
     volumes:
       - .:/app
+    command: >
+      bash -lc "
+        python manage.py migrate --noinput &&
+        python manage.py runserver 0.0.0.0:8000
+      "
     healthcheck:
       test: [ "CMD-SHELL", "curl -fsS http://localhost:8000/api/schema/ >/dev/null || exit 1" ]
       interval: 10s
       timeout: 3s
       retries: 20
     restart: unless-stopped
-
 
   worker:
     build:
@@ -64,10 +67,10 @@ services:
       db: { condition: service_healthy }
       redis: { condition: service_healthy }
     user: "${UID:-1000}:${GID:-1000}"
-    command: >
-      bash -lc "celery -A config worker -l info --concurrency=${CELERY_CONCURRENCY:-10}"
     volumes:
       - .:/app
+    command: >
+      bash -lc "celery -A config worker -l info --concurrency=${CELERY_CONCURRENCY:-2}"
     restart: unless-stopped
 
   beat:
@@ -81,16 +84,13 @@ services:
       db: { condition: service_healthy }
       redis: { condition: service_healthy }
     user: "${UID:-1000}:${GID:-1000}"
-    # 스케줄 파일을 볼륨(/data)에 저장해서 재시작해도 유지
-    command: >
-      bash -lc "celery -A config beat -l info -s /data/celerybeat-schedule"
     volumes:
       - .:/app
       - beat-data:/data
+    command: >
+      bash -lc "celery -A config beat -l info -s /data/celerybeat-schedule"
     restart: unless-stopped
 
 volumes:
   dbdata:
-  # web-static:
-  # web-media:
   beat-data:
