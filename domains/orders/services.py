@@ -24,7 +24,7 @@ class EmptyCartError(ValidationError):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 장바구니 → 다건 구매(현재 운영 구매 구조 유지용)
+# 장바구니 → 다건 구매(기존 Purchase 구조 유지용)
 # ─────────────────────────────────────────────────────────────────────────────
 @transaction.atomic
 def checkout_user_cart(user, *, clear_cart: bool = True) -> List[Purchase]:
@@ -90,57 +90,84 @@ def checkout_user_cart(user, *, clear_cart: bool = True) -> List[Purchase]:
 # ─────────────────────────────────────────────────────────────────────────────
 @transaction.atomic
 def checkout(user) -> Tuple[Purchase, "Payment"]:
-    acc = _cart_items_accessor()
-    qs = Cart.objects.select_related("user")
-    if acc: qs = qs.prefetch_related(acc)
-    cart = qs.filter(user=user).first()
-    if not cart or not acc or not getattr(cart, acc).exists():
+    """
+    단일 주문 헤더(Purchase)와 결제 스텁을 생성한다.
+    - 카트가 비어있으면 EmptyCartError
+    - 재고 확보 실패 시 ValidationError
+    - 이 단계에서는 카트를 비우지 않는다(결제 확정 후 비움)
+    """
+    # 0) 카트 로드(+프리패치)
+    cart: Optional[Cart] = (
+        Cart.objects
+        .select_related("user")
+        .prefetch_related(
+            "items",
+            "items__product",
+            # "items__stock",             # stock 모델 연동 시 사용
+            "items__product__category",
+        )
+        .filter(user=user)
+        .first()
+    )
+    if not cart:
         raise EmptyCartError({"cart": "장바구니가 없습니다."})
+    if not cart.items.exists():
+        raise EmptyCartError({"cart": "장바구니에 담긴 상품이 없습니다."})
 
     # 1) 헤더 생성 (ready)
     order = Purchase.objects.create(
         user=user,
-        status="ready",
+        status=Purchase.STATUS_READY,
         # ↓ items_total/grand_total는 라인 생성 후 다시 업데이트
         items_total=0,
         grand_total=0,
     )
 
-    # 2) 재고 확보 + 라인 생성
-    items_qs = getattr(cart, acc).select_related("product").select_for_update().order_by("product_id", "option_key")
-    for it in items_qs:
-        reserve_stock(it.product_id, it.option_key or "", it.quantity)
+    # 2) 재고 확보 + 라인 생성 (락)
+    items_qs = (
+        cart.items.select_related("product")
+        .select_for_update()
+        .order_by("product_id", "option_key")
+    )
+
+    try:
+        for it in items_qs:
+            reserve_stock(it.product_id, it.option_key or "", it.quantity)
+    except (OutOfStockError, StockRowMissing) as e:
+        # 헤더 생성했더라도 트랜잭션 전체 롤백되므로 안전
+        raise ValidationError({"stock": str(e)})
 
     line_total_sum = 0
-    order_items = []
+    order_items: list[OrderItem] = []
     for it in items_qs:
         p = it.product
-        # 필요시 썸네일/sku를 Product나 ProductStock에서 가져와 채워넣기
-        oi = OrderItem(
-            order=order,
-            product_id=it.product_id,
-            stock=None,  # variant 사용시 연결
-            product_name=p.name,
-            thumbnail_url=None,   # 이미지 테이블 쓰면 여기서 세팅
-            sku=None,
-            option_key=it.option_key or "",
-            options=it.options or {},
-            unit_price=it.unit_price,
-            quantity=it.quantity,
-            currency="KRW",
+        order_items.append(
+            OrderItem(
+                order=order,
+                product_id=it.product_id,
+                stock=None,                 # variant/stock 사용 시 연결
+                product_name=p.name,        # 스냅샷
+                thumbnail_url=getattr(p, "thumbnail_url", None),
+                sku=None,
+                option_key=it.option_key or "",
+                options=it.options or {},
+                unit_price=it.unit_price,
+                quantity=it.quantity,
+                currency="KRW",
+            )
         )
-        order_items.append(oi)
         line_total_sum += (it.unit_price * it.quantity)
+
     OrderItem.objects.bulk_create(order_items)
 
     # 3) 헤더 합계 반영
     order.items_total = line_total_sum
-    order.grand_total = line_total_sum  # 배송비/쿠폰 있으면 계산식에 반영
+    order.grand_total = line_total_sum  # 배송비/쿠폰 있으면 계산식 반영
     order.save(update_fields=["items_total", "grand_total"])
 
-    # 4) 결제 스텁
+    # 4) 결제 스텁 생성
+    from domains.payments.services import create_payment_stub  # ← 여기로 이동(지연 import)
     payment = create_payment_stub(order, amount=order.grand_total)
-
     return order, payment
 
 
@@ -166,6 +193,10 @@ def refund_purchase(purchase: Purchase) -> Purchase:
     purchase.save(update_fields=["status"])
     return purchase
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 결제 승인 직후: 카트 -> OrderItem 생성(멱등)
+# ─────────────────────────────────────────────────────────────────────────────
 @transaction.atomic
 def create_order_items_from_cart(purchase: Purchase) -> int:
     """
@@ -191,28 +222,32 @@ def create_order_items_from_cart(purchase: Purchase) -> int:
     items_to_create: list[OrderItem] = []
 
     # 재고 차감 + 라인 스냅샷 준비
-    for ci in cart.items.select_related("product").order_by("product_id", "option_key"):
-        # 필요 수량 확보 (옵션 없는 상품이면 option_key는 "" 가능)
-        reserve_stock(ci.product_id, ci.option_key or "", ci.quantity)
+    try:
+        for ci in cart.items.select_related("product").order_by("product_id", "option_key"):
+            reserve_stock(ci.product_id, ci.option_key or "", ci.quantity)
 
-        items_to_create.append(
-            OrderItem(
-                order=purchase,
-                product_id=ci.product_id,
-                stock_id=None,                         # 옵션 재고 행을 별도 추적한다면 채워주세요
-                product_name=ci.product.name,          # 스냅샷
-                thumbnail_url=getattr(ci.product, "thumbnail_url", "") or "",
-                sku="",                                # SKU 쓰면 매핑
-                option_key=ci.option_key or "",
-                options=ci.options or {},
-                unit_price=ci.unit_price,
-                quantity=ci.quantity,
-                line_discount=0,
-                line_tax=0,
-                currency="KRW",
+            items_to_create.append(
+                OrderItem(
+                    order=purchase,
+                    product_id=ci.product_id,
+                    stock_id=None,                         # 옵션 재고 행을 별도 추적한다면 채워주세요
+                    product_name=ci.product.name,          # 스냅샷
+                    thumbnail_url=getattr(ci.product, "thumbnail_url", "") or "",
+                    sku="",                                # SKU 쓰면 매핑
+                    option_key=ci.option_key or "",
+                    options=ci.options or {},
+                    unit_price=ci.unit_price,
+                    quantity=ci.quantity,
+                    line_discount=0,
+                    line_tax=0,
+                    currency="KRW",
+                )
             )
-        )
+    except (OutOfStockError, StockRowMissing) as e:
+        raise ValidationError({"stock": str(e)})
 
     OrderItem.objects.bulk_create(items_to_create)
-    clear_cart(cart)
+
+    # 카트 비우기
+    clear_cart_items(cart)
     return len(items_to_create)

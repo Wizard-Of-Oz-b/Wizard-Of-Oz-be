@@ -18,5 +18,9 @@ urlpatterns = [
 
     # 상품 리뷰 (상품별 목록/작성)
     # GET/POST /api/v1/products/<product_id>/reviews/
-    path("<uuid:product_id>/reviews/", ProductReviewListCreateAPI.as_view(), name="reviews"),
+    path(
+        "products/<uuid:product_id>/reviews/",
+        ProductReviewListCreateAPI.as_view(),
+        name="product-reviews",
+    ),
 ]
