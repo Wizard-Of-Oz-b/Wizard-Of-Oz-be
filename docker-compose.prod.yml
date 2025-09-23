@@ -16,8 +16,13 @@ services:
       timeout: 5s
       retries: 30
     restart: unless-stopped
-    mem_limit: "512m"
-    # RDS 사용 시, 이 서비스 전체를 제거하고 DATABASE_URL 환경변수로 주입하세요.
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 128M
+    # RDS 사용 시, 이 서비스 제거 + DATABASE_URL 만 주입
 
   redis:
     image: redis:7
@@ -27,18 +32,25 @@ services:
       timeout: 5s
       retries: 30
     restart: unless-stopped
-    mem_limit: "256m"
-    # ElastiCache 사용 시, 이 서비스 제거 + REDIS_URL 환경변수만 주입
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 64M
+    # ElastiCache 사용 시, 이 서비스 제거 + REDIS_URL만 주입
 
   web:
-    # 이미지 레지스트리 사용 시:
+    # 레지스트리 이미지 사용 시:
     # image: ghcr.io/OWNER/REPO:latest
     build:
       context: .
-    env_file: /srv/app/.env            # EC2에 배치된 운영용 .env
+    env_file: /srv/app/.env          # EC2에 배치된 운영용 .env
     depends_on:
-      db: { condition: service_healthy }
-      redis: { condition: service_healthy }
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "8000:8000"
     command: >
@@ -54,38 +66,57 @@ services:
           --timeout 60
       "
     healthcheck:
-      test: [ "CMD-SHELL", "curl -fsS http://localhost:8000/api/schema/ >/dev/null || exit 1" ]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/api/schema/ >/dev/null || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 30
     restart: unless-stopped
-    mem_limit: "512m"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 128M
 
   worker:
     build:
       context: .
     env_file: /srv/app/.env
     depends_on:
-      db: { condition: service_healthy }
-      redis: { condition: service_healthy }
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     command: >
       bash -lc "celery -A config worker -l info --concurrency=${CELERY_CONCURRENCY:-2}"
     restart: unless-stopped
-    mem_limit: "256m"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 64M
 
   beat:
     build:
       context: .
     env_file: /srv/app/.env
     depends_on:
-      db: { condition: service_healthy }
-      redis: { condition: service_healthy }
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
       - beat-data:/data
     command: >
       bash -lc "celery -A config beat -l info -s /data/celerybeat-schedule"
     restart: unless-stopped
-    mem_limit: "128m"
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 32M
 
 volumes:
   dbdata:
