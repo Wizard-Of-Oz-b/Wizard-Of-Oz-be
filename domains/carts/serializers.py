@@ -1,14 +1,20 @@
 # domains/carts/serializers.py
 from __future__ import annotations
 
-from typing import Dict, Any
-
+from typing import Dict, Any, Optional
 from rest_framework import serializers
 
 from .models import Cart, CartItem
 from domains.catalog.models import Product
 from .services import add_or_update_item, make_option_key
 from domains.orders.utils import parse_option_key_safe
+
+
+def _abs_url(request, url: Optional[str]) -> Optional[str]:
+    """request가 있으면 절대 URL, 없으면 상대 URL. 빈 값이면 None."""
+    if not url:
+        return None
+    return request.build_absolute_uri(url) if request else url
 
 
 def _validate_option_key_value(v: str) -> str:
@@ -42,7 +48,7 @@ class CartItemSerializer(serializers.ModelSerializer):
             "options",
             "quantity",
             "unit_price",
-            "image_url",      # 👈 추가: 대표 이미지 URL
+            "image_url",      # 👈 대표 이미지 URL(절대경로 보장)
             "added_at",
         )
         read_only_fields = (
@@ -53,36 +59,51 @@ class CartItemSerializer(serializers.ModelSerializer):
             "product_name",
         )
 
-    def get_image_url(self, obj) -> str | None:
+    def get_image_url(self, obj) -> Optional[str]:
         """
         대표 이미지 선택 규칙:
         1) Product.thumbnail_url 필드가 있으면 그 값을 사용
-        2) Product.images (related_name='images')가 있으면 첫 번째 이미지의 image_url 사용
+        2) Product.images (related_name='images' 또는 기본 productimage_set)가 있으면 첫 번째 이미지의 image.url 사용
         3) 없으면 None
         """
-        # 1) 직접 필드 우선
-        url = getattr(obj.product, "thumbnail_url", None)
-        if url:
-            return url
+        request = self.context.get("request")
 
-        # 2) 관련 이미지가 프리패치 되어 있다면 첫 번째를 사용
-        images = getattr(obj.product, "images", None)
-        # images가 RelatedManager면 .all() 호출 가능
-        if images is not None and hasattr(images, "all"):
-            first = next(iter(images.all()), None)
+        # 1) 모델에 직접 썸네일 필드가 존재하는 경우 우선
+        thumb = getattr(obj.product, "thumbnail_url", None)
+        if thumb:
+            return _abs_url(request, thumb)
+
+        # 2) 역참조 이미지 풀에서 첫 장
+        imgs = None
+        if hasattr(obj.product, "images"):
+            imgs = getattr(obj.product, "images").all()
+        elif hasattr(obj.product, "productimage_set"):
+            imgs = getattr(obj.product, "productimage_set").all()
+
+        if imgs:
+            first = next(iter(imgs), None)
             if first is not None:
-                return getattr(first, "image_url", None)
+                # 일반적인 ImageField명: image
+                image_field = getattr(first, "image", None)
+                raw_url = getattr(image_field, "url", None) if image_field else None
+                return _abs_url(request, raw_url)
 
         return None
 
 
 class CartSerializer(serializers.ModelSerializer):
     items = CartItemSerializer(many=True, read_only=True)
+    items_total = serializers.SerializerMethodField()
+    item_count = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Cart
-        fields = ("id", "user", "expires_at", "updated_at", "items")
-        read_only_fields = ("id", "user", "expires_at", "updated_at", "items")
+        fields = ("id", "user", "expires_at", "updated_at", "items", "items_total", "item_count")
+        read_only_fields = ("id", "user", "expires_at", "updated_at", "items", "items_total", "item_count")
+
+    def get_items_total(self, instance: Cart) -> str:
+        # 모델 프로퍼티 total_price를 문자열로 변환(Decimal 직렬화 일관성)
+        return str(instance.total_price)
 
 
 # ---------------------------
@@ -94,6 +115,7 @@ class AddCartItemSerializer(serializers.Serializer):
     - 아래 중 하나만 보내세요:
       1) option_key: "size=L&color=red"
       2) options: {"size":"L", "color":"red"}
+    - 둘 다 비우면 '옵션 없음'으로 처리됩니다.
     """
     product = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all())
     quantity = serializers.IntegerField(min_value=1, default=1)
@@ -136,8 +158,8 @@ class AddCartItemSerializer(serializers.Serializer):
         product: Product = validated_data["product"]
         quantity: int = validated_data.get("quantity", 1)
 
-        option_key: str | None = validated_data.get("option_key", None)
-        options: Dict[str, Any] | None = validated_data.get("options", None)
+        option_key: Optional[str] = validated_data.get("option_key", None)
+        options: Optional[Dict[str, Any]] = validated_data.get("options", None)
 
         # option_key가 오면 파싱해서 dict로 변환 (빈 문자열이면 옵션 없음)
         if option_key is not None:
@@ -145,9 +167,7 @@ class AddCartItemSerializer(serializers.Serializer):
                 parsed = parse_option_key_safe(option_key)
                 # validate_option_key에서 1차 검증하지만, 혹시 몰라 다시 방어
                 if parsed is None:
-                    raise serializers.ValidationError(
-                        {"option_key": "옵션 형식이 잘못되었습니다."}
-                    )
+                    raise serializers.ValidationError({"option_key": "옵션 형식이 잘못되었습니다."})
                 options = parsed
             else:
                 options = {}
@@ -156,7 +176,7 @@ class AddCartItemSerializer(serializers.Serializer):
         if options is not None and option_key is None:
             option_key = make_option_key(options)
 
-        # 서비스 호출
+        # 서비스 호출 (유니크 제약 기반 upsert/수량합산 포함)
         cart, item = add_or_update_item(
             user=user,
             product=product,
@@ -166,6 +186,7 @@ class AddCartItemSerializer(serializers.Serializer):
         )
         return item
 
-    # 응답은 읽기용 serializer로 통일(이미지 포함)
+    # 응답은 읽기용 serializer로 통일(이미지 포함, 절대 URL 위해 request context 전달)
     def to_representation(self, instance: CartItem) -> Dict[str, Any]:
-        return CartItemSerializer(instance).data
+        ser = CartItemSerializer(instance, context=self.context)
+        return ser.data
