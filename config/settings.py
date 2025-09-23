@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django_celery_beat",
 
     # 3rd party
     "rest_framework",
@@ -273,9 +274,10 @@ CELERY_RESULT_SERIALIZER = "json"
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 
 CELERY_BEAT_SCHEDULE = {
-    "poll-open-shipments-30m": {
+    "poll-open-shipments-every-30s": {
         "task": "domains.shipments.tasks.poll_open_shipments",
-        "schedule": crontab(minute="*/30"),
+        "schedule": 30.0,  # 30초마다
+        # "options": {"queue": "celery"},
     },
 }
 
@@ -285,4 +287,3 @@ DEFAULT_PRODUCT_PLACEHOLDER_URL = "/static/img/product_placeholder.png"
 SHIPMENTS_NOTIFY_WEBHOOK = os.getenv("SHIPMENTS_NOTIFY_WEBHOOK")
 
 APPEND_SLASH = True
-

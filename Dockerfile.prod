@@ -1,0 +1,32 @@
+# ==== base ====
+FROM python:3.13-slim AS base
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl ca-certificates \
+ && rm -rf /var/lib/apt/lists/* \
+ && curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# ★ uv가 깔리는 경로를 PATH에 먼저 추가
+ENV PATH="/root/.local/bin:${PATH}"
+
+WORKDIR /app
+COPY pyproject.toml uv.lock ./
+
+# prod만 설치
+RUN uv sync --frozen --no-dev
+
+# venv PATH 등록 (런타임용)
+ENV VIRTUAL_ENV=/app/.venv
+ENV PATH="$VIRTUAL_ENV/bin:${PATH}"
+
+COPY . .
+RUN uv run python manage.py collectstatic --noinput || true
+
+RUN useradd -m appuser \
+ && chown -R appuser:appuser /app \
+ && chmod -R a+rX /app \
+ && find /app/.venv/bin -type f -exec chmod a+x {} \;
+
+USER appuser
+EXPOSE 8000
+CMD ["uv", "run", "gunicorn", "config.asgi:application", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000", "--workers", "2", "--timeout", "60"]
