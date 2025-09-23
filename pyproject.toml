@@ -19,6 +19,11 @@ dependencies = [
     # uv를 메인으로 쓴다면 여기에 추가해도 됨
     # "django-cors-headers>=4.8.0",
     "whitenoise>=6.10.0",
+    "celery[redis]>=5.3",
+    "gunicorn>=21.2",
+    "uvicorn==0.30.*",
+    "django-celery-beat>=2.8.1",
+    "django-celery-beat",
 ]
 
 [dependency-groups]

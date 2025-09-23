@@ -1,6 +1,3 @@
-
-version: "3.9"
-
 services:
   db:
     image: postgres:16
@@ -10,7 +7,8 @@ services:
       POSTGRES_PASSWORD: secret
     volumes:
       - dbdata:/var/lib/postgresql/data
-      
+    ports:
+      - "5433:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U shop -d shopapi"]
       interval: 5s
@@ -20,60 +18,65 @@ services:
 
   redis:
     image: redis:7
-    restart: unless-stopped
+    ports:
+      - "6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 20
+    restart: unless-stopped
 
   web:
     build:
       context: .
-      dockerfile: Dockerfile.prod
-    env_file: .env.prod
+      dockerfile: Dockerfile.dev
+    env_file: .env.dev
     depends_on:
       db: { condition: service_healthy }
       redis: { condition: service_healthy }
     ports:
       - "8000:8000"
+    volumes:
+      - .:/app
+      - /app/.venv
     healthcheck:
       test: ["CMD-SHELL","curl -fsS http://localhost:8000/api/schema/ >/dev/null || exit 1"]
       interval: 10s
       timeout: 3s
       retries: 20
-
     restart: unless-stopped
 
   worker:
     build:
       context: .
-
-      dockerfile: Dockerfile.prod
-    env_file: .env.prod
+      dockerfile: Dockerfile.dev
+    env_file: .env.dev
     depends_on:
       db: { condition: service_healthy }
       redis: { condition: service_healthy }
-    entrypoint: [ ]   # 이미지의 CMD만 있고 ENTRYPOINT는 없지만, 혹시 모를 잔재를 안전하게 제거
-    command: [ "uv", "run", "celery", "-A", "config", "worker", "-l", "info", "--concurrency=1" ]
+    command: >
+      bash -lc "uv run celery -A config worker -l info --concurrency=1"
+    volumes:
+      - .:/app
+      - /app/.venv
     restart: unless-stopped
 
   beat:
-    user: "1000:1000"
     build:
       context: .
-      dockerfile: Dockerfile.prod
-    env_file: .env.prod
+      dockerfile: Dockerfile.dev
+    env_file: .env.dev
     depends_on:
       db: { condition: service_healthy }
       redis: { condition: service_healthy }
+    command: >
+      bash -lc "uv run celery -A config beat -l info -s /data/celerybeat-schedule"
     volumes:
-      - beat-data:/app/beat-data
-    entrypoint: [ ]
-    command: [ "uv", "run", "celery", "-A", "config", "beat", "-l", "info",
-                 "-s", "/app/beat-data/celerybeat-schedule" ]
+      - .:/app
+      - /app/.venv
+      - beat-data:/data
     restart: unless-stopped
-
 
 volumes:
   dbdata:
