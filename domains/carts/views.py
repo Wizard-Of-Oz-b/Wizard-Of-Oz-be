@@ -8,8 +8,6 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
 
-from django.db.models import Prefetch
-
 from .models import CartItem, Cart
 from .serializers import CartSerializer, AddCartItemSerializer, CartItemSerializer
 from .services import get_or_create_user_cart
@@ -21,6 +19,9 @@ class UpdateCartQtySerializer(serializers.Serializer):
     quantity = serializers.IntegerField(min_value=1)
 
 
+# ─────────────────────────────────────────────────────────────
+# GET 내 카트 조회
+# ─────────────────────────────────────────────────────────────
 class MyCartView(APIView):
     permission_classes = [IsAuthenticated]
     serializer_class = CartSerializer  # ← 응답 스키마 힌트
@@ -33,26 +34,30 @@ class MyCartView(APIView):
     def get(self, request):
         """
         내 카트 조회.
-        - N+1 방지: items -> product (및 product.images가 있으면 이미지까지) prefetch
+        - N+1 방지: items -> product (및 product.images / productimage_set까지) prefetch
+        - 이미지 절대 URL을 위해 serializer context에 request 전달
         """
-        # 카트가 없으면 생성
         cart = get_or_create_user_cart(request.user)
 
-        # Product에 images related_name이 있으면 prefetch에 포함
+        # Product에 images 또는 기본 productimage_set가 있으면 프리패치
         prefetches = ["items__product"]
         if hasattr(Product, "images"):
             prefetches.append("items__product__images")
+        if hasattr(Product, "productimage_set"):
+            prefetches.append("items__product__productimage_set")
 
-        # 프리패치된 상태로 다시 로드
         cart = (
             Cart.objects
             .select_related("user")
             .prefetch_related(*prefetches)
             .get(pk=cart.pk)
         )
-        return Response(CartSerializer(cart).data)
+        return Response(CartSerializer(cart, context={"request": request}).data)
 
 
+# ─────────────────────────────────────────────────────────────
+# POST 장바구니에 상품 추가
+# ─────────────────────────────────────────────────────────────
 class CartItemAddView(APIView):
     permission_classes = [IsAuthenticated]
     serializer_class = CartItemSerializer  # 응답의 형태
@@ -66,7 +71,9 @@ class CartItemAddView(APIView):
     def post(self, request):
         """
         장바구니에 상품 추가.
-        - 응답에서 image_url을 올바르게 주기 위해 product(+images)까지 프리패치해서 반환
+        - option_key 또는 options 중 하나만 사용(둘 다 비어있으면 '옵션 없음')
+        - 응답에서 image_url 절대경로를 위해 serializer context에 request 전달
+        - N+1 방지를 위해 product(+images) 프리패치 후 반환
         """
         ser = AddCartItemSerializer(data=request.data, context={"request": request})
         ser.is_valid(raise_exception=True)
@@ -76,11 +83,58 @@ class CartItemAddView(APIView):
         qs = CartItem.objects.select_related("product")
         if hasattr(Product, "images"):
             qs = qs.prefetch_related("product__images")
+        if hasattr(Product, "productimage_set"):
+            qs = qs.prefetch_related("product__productimage_set")
         item = qs.get(pk=item.pk)
 
-        return Response(CartItemSerializer(item).data, status=status.HTTP_201_CREATED)
+        return Response(
+            CartItemSerializer(item, context={"request": request}).data,
+            status=status.HTTP_201_CREATED,
+        )
 
 
+# ─────────────────────────────────────────────────────────────
+# PATCH 수량 변경
+# ─────────────────────────────────────────────────────────────
+class CartItemQuantityView(APIView):
+    """
+    PATCH /api/v1/carts/items/{item_id}/quantity
+    body: { "quantity": <int>=1+ }
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(
+        operation_id="UpdateCartItemQuantity",
+        request=UpdateCartQtySerializer,
+        parameters=[
+            OpenApiParameter("item_id", OpenApiTypes.UUID, OpenApiParameter.PATH, required=True),
+        ],
+        responses={200: CartItemSerializer, 400: dict, 404: dict},
+        tags=["Carts"],
+    )
+    def patch(self, request, item_id):
+        ser = UpdateCartQtySerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        qty = ser.validated_data["quantity"]
+
+        item = get_object_or_404(CartItem, pk=item_id, cart__user=request.user)
+        item.quantity = qty
+        item.save(update_fields=["quantity"])
+
+        # 최신 product/이미지 프리패치 후 반환
+        qs = CartItem.objects.select_related("product")
+        if hasattr(Product, "images"):
+            qs = qs.prefetch_related("product__images")
+        if hasattr(Product, "productimage_set"):
+            qs = qs.prefetch_related("product__productimage_set")
+        item = qs.get(pk=item.pk)
+
+        return Response(CartItemSerializer(item, context={"request": request}).data, status=200)
+
+
+# ─────────────────────────────────────────────────────────────
+# DELETE 상품 + 옵션키 조합으로 한 줄 삭제
+# ─────────────────────────────────────────────────────────────
 class CartItemDeleteByProductOptionAPI(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -118,20 +172,20 @@ class CartItemDeleteByProductOptionAPI(APIView):
         if option_key is None:
             return Response({"detail": "option_key is required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # 본인 장바구니에서만 삭제 가능
-        qs = CartItem.objects.filter(
+        deleted, _ = CartItem.objects.filter(
             cart__user=request.user,
             product_id=product_id,
             option_key=option_key,
-        )
+        ).delete()
 
-        deleted, _ = qs.delete()
         if deleted == 0:
             return Response({"detail": "item_not_found"}, status=status.HTTP_404_NOT_FOUND)
-
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+# ─────────────────────────────────────────────────────────────
+# DELETE item_id로 한 줄 삭제
+# ─────────────────────────────────────────────────────────────
 class CartItemDetailView(generics.DestroyAPIView):
     """
     DELETE /api/v1/carts/items/<item_id>/
@@ -140,6 +194,35 @@ class CartItemDetailView(generics.DestroyAPIView):
     permission_classes = [permissions.IsAuthenticated]
     lookup_url_kwarg = "item_id"
 
+    @extend_schema(
+        operation_id="DeleteCartItemById",
+        responses={204: None, 404: dict},
+        tags=["Carts"],
+    )
+    def delete(self, request, *args, **kwargs):
+        return super().delete(request, *args, **kwargs)
+
     def get_queryset(self):
         # 본인 소유 카트만
         return CartItem.objects.filter(cart__user=self.request.user)
+
+
+# ─────────────────────────────────────────────────────────────
+# DELETE 카트 전체 비우기 (선택)
+# ─────────────────────────────────────────────────────────────
+class CartClearView(APIView):
+    """
+    DELETE /api/v1/carts/clear
+    → 내 카트 전체 비우기
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(
+        operation_id="ClearMyCart",
+        responses={204: None},
+        tags=["Carts"],
+    )
+    def delete(self, request):
+        cart = get_or_create_user_cart(request.user)
+        cart.items.all().delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
