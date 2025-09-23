@@ -1,0 +1,92 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: shopapi
+      POSTGRES_USER: shop
+      POSTGRES_PASSWORD: secret
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+    # 운영에선 외부 포트 노출 안 함 (웹/워커/비트만 접근)
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shop -d shopapi"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+    mem_limit: "512m"
+    # RDS 사용 시, 이 서비스 전체를 제거하고 DATABASE_URL 환경변수로 주입하세요.
+
+  redis:
+    image: redis:7
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+    mem_limit: "256m"
+    # ElastiCache 사용 시, 이 서비스 제거 + REDIS_URL 환경변수만 주입
+
+  web:
+    # 이미지 레지스트리 사용 시:
+    # image: ghcr.io/OWNER/REPO:latest
+    build:
+      context: .
+    env_file: /srv/app/.env            # EC2에 배치된 운영용 .env
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    ports:
+      - "8000:8000"
+    command: >
+      bash -lc "
+        python manage.py migrate --noinput &&
+        gunicorn config.wsgi:application
+          --bind 0.0.0.0:8000
+          --workers ${GUNICORN_WORKERS:-1}
+          --threads ${GUNICORN_THREADS:-1}
+          --worker-class uvicorn.workers.UvicornWorker
+          --max-requests 200
+          --max-requests-jitter 50
+          --timeout 60
+      "
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -fsS http://localhost:8000/api/schema/ >/dev/null || exit 1" ]
+      interval: 15s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+    mem_limit: "512m"
+
+  worker:
+    build:
+      context: .
+    env_file: /srv/app/.env
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    command: >
+      bash -lc "celery -A config worker -l info --concurrency=${CELERY_CONCURRENCY:-2}"
+    restart: unless-stopped
+    mem_limit: "256m"
+
+  beat:
+    build:
+      context: .
+    env_file: /srv/app/.env
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    volumes:
+      - beat-data:/data
+    command: >
+      bash -lc "celery -A config beat -l info -s /data/celerybeat-schedule"
+    restart: unless-stopped
+    mem_limit: "128m"
+
+volumes:
+  dbdata:
+  beat-data:
