@@ -1,20 +1,27 @@
 # config/settings.py
+
 import os
 from pathlib import Path
 from datetime import timedelta
 from dotenv import load_dotenv
 from celery.schedules import crontab
 
-
 # ──────────────────────────────────────────────────────────────────────────────
-# Base & Env
+# Base & Env (환경별 .env 자동 로딩)
 # ──────────────────────────────────────────────────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent.parent
-load_dotenv(BASE_DIR / ".env")  # .env 로드
 
-# 1) (선택) 컨테이너에서만 .env.docker 읽게 하거나, 아예 주석 처리
-# from dotenv import load_dotenv
-# load_dotenv(BASE_DIR / ".env.docker")  # compose의 env_file만 쓴다면 이 줄도 생략 가능
+# DJANGO_ENV 에 따라 .env.<DJANGO_ENV> → .env 순서로 로드
+# 예) dev → .env.dev, prod → .env.prod
+DJANGO_ENV = os.getenv("DJANGO_ENV", "dev").strip().lower()
+env_file = BASE_DIR / f".env.{DJANGO_ENV}"
+if env_file.exists():
+    load_dotenv(env_file, override=True)
+
+# 공통 키 보완용(.env). 이미 로드된 값은 유지(override=False)
+common_env = BASE_DIR / ".env"
+if common_env.exists():
+    load_dotenv(common_env, override=False)
 
 # 2) 여기서 바로 환경변수 읽기
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-secret")
@@ -165,7 +172,6 @@ REST_FRAMEWORK = {
     ],
 }
 
-
 SPECTACULAR_SETTINGS = {
     "TITLE": "Fashion Shop API",
     "DESCRIPTION": "Shop / Admin endpoints with JWT (Bearer).",
@@ -280,7 +286,6 @@ CELERY_BEAT_SCHEDULE = {
         # "options": {"queue": "celery"},
     },
 }
-
 
 DEFAULT_PRODUCT_PLACEHOLDER_URL = "/static/img/product_placeholder.png"
 

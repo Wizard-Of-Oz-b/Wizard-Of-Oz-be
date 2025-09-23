@@ -1,23 +1,30 @@
+# Dockerfile.dev (핵심라인만)
 FROM python:3.13-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    UV_SYSTEM_PYTHON=1
+    UV_PROJECT_ENVIRONMENT=/opt/venv
 
-# uv 설치
-RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates \
- && rm -rf /var/lib/apt/lists/* \
- && curl -LsSf https://astral.sh/uv/install.sh | sh
-ENV PATH="/root/.local/bin:${PATH}"
+# 필수 시스템 패키지
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential libpq-dev curl \
+ && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# 의존성 캐시 레이어
-COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen   # dev 그룹 포함 설치
+# uv 설치
+RUN python -m pip install --upgrade pip && pip install uv
 
-# 소스 복사
+# 의존성 캐시 레이어 만들기
+COPY pyproject.toml uv.lock ./
+RUN uv venv /opt/venv \
+ && uv sync --frozen
+
+# 앱 코드 (마지막에 복사해 캐시 적게 깨지게)
 COPY . .
 
+# 필요 시 포트만 노출
 EXPOSE 8000
-CMD ["uv","run","python","manage.py","runserver","0.0.0.0:8000"]
+
+ENV VIRTUAL_ENV=/opt/venv
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
