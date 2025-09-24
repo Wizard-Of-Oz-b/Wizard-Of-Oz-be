@@ -16,7 +16,7 @@ from shared.pagination import StandardResultsSetPagination
     parameters=[
         OpenApiParameter(
             name="product_id",
-            type=OpenApiTypes.UUID,                 # 👈 UUID 로 명시
+            type=OpenApiTypes.UUID,   # 👈 UUID
             location=OpenApiParameter.PATH,
             description="상품 ID (UUID)",
             required=True,
@@ -32,7 +32,7 @@ class ProductReviewListCreateAPI(generics.ListCreateAPIView):
     queryset = Review.objects.none()
 
     def get_queryset(self):
-        # 스키마 생성 시에는 빈 쿼리셋 반환
+        # 스키마 생성 시에는 빈 쿼리셋
         if getattr(self, "swagger_fake_view", False):
             return Review.objects.none()
         return (
@@ -50,17 +50,18 @@ class ProductReviewListCreateAPI(generics.ListCreateAPIView):
         )
 
     def perform_create(self, serializer):
-        # 구매자만 작성 조건이 있다면 여기서 추가 검증
-        serializer.save(
-            user=self.request.user,
-            product_id=self.kwargs.get("product_id"),
-        )
+        """
+        ReviewWriteSerializer.validate()에서 이미
+        user/product_id를 attrs에 주입하므로 여기서는 단순 save().
+        """
+        serializer.save()
 
     def get_serializer_class(self):
         return ReviewWriteSerializer if self.request.method == "POST" else ReviewReadSerializer
 
     def get_serializer_context(self):
         ctx = super().get_serializer_context()
+        # Serializer에서 product_id를 사용할 수 있게 컨텍스트로 전달
         ctx["product_id"] = self.kwargs["product_id"]
         return ctx
 
@@ -69,7 +70,7 @@ class ProductReviewListCreateAPI(generics.ListCreateAPIView):
         parameters=[
             OpenApiParameter(
                 "product_id",
-                OpenApiTypes.UUID,                    # 👈 UUID 로 명시
+                OpenApiTypes.UUID,
                 OpenApiParameter.PATH,
                 description="상품 ID (UUID)",
                 required=True,
@@ -89,6 +90,8 @@ class ProductReviewListCreateAPI(generics.ListCreateAPIView):
                 description="페이지 크기",
             ),
         ],
+        # 실제 응답은 {"items": [...], "avg_rating": float, "count": int} 형태지만
+        # 스키마 단순화를 위해 items에 대한 타입만 지정
         responses={200: ReviewReadSerializer(many=True)},
         tags=["products"],
     )
@@ -117,6 +120,7 @@ class ProductReviewListCreateAPI(generics.ListCreateAPIView):
         tags=["products"],
     )
     def post(self, request, *args, **kwargs):
+        # 유효한 상품인지 선검증
         get_object_or_404(Product, pk=kwargs["product_id"])
         return super().post(request, *args, **kwargs)
 
