@@ -19,7 +19,7 @@ urlpatterns = [
 
     # --- Reviews ---
     # (상품별 리뷰는 products 쪽에만 등록하므로 여기선 전역 리뷰 전용 라우트만)
-    path("reviews/", include(("domains.reviews.urls", "reviews"))),
+    path("reviews/", include(("domains.reviews.urls", "reviews"))),  # 개별 리뷰 상세용
 
     # --- Orders ---
     path("orders/", include(("domains.orders.urls", "orders"))),

@@ -6,5 +6,5 @@ app_name = "reviews"
 
 urlpatterns = [
     # /api/v1/reviews/<review_id>/
-    path("<int:review_id>/", ReviewDetailAPI.as_view(), name="detail"),
+    path("<uuid:review_id>/", ReviewDetailAPI.as_view(), name="detail"),
 ]
