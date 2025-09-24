@@ -280,9 +280,11 @@ CELERY_RESULT_SERIALIZER = "json"
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 
 CELERY_BEAT_SCHEDULE = {
-    "poll-open-shipments-every-120s": {
-        "task": "domains.shipments.tasks.poll_open_shipments",
-        "schedule": 120.0,
+    "poll-shipments-every-2min": {
+        "task": "domains.shipments.tasks.poll_open_shipments",  # 너희 태스크 경로
+        "schedule": 120.0,  # 2분마다 (또는 crontab(minute="*/2"))
+        "args": [],         # 필요시 인자
+        "kwargs": {},       # 필요시 키워드 인자
     },
 }
 

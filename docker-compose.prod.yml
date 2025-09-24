@@ -1,84 +1,127 @@
+# Compose v2: version 키 불필요
+
+# 공통 로그 롤링(디스크 폭주 방지, RAM 영향 거의 無)
+x-logging: &tight-logging
+  driver: json-file
+  options:
+    max-size: "5m"
+    max-file: "2"
+
+# 공통 파이썬/메모리 친화 env
+x-py-memenv: &py-memenv
+  MALLOC_ARENA_MAX: "2"     # glibc arena 과다 할당 방지
+  PYTHONDONTWRITEBYTECODE: "1"
+  PYTHONUNBUFFERED: "1"
+
 services:
+  # ⬇️ 여기서만 build → 결과 이미지를 모든 서비스가 재사용
   web:
+    image: wizard-of-oz-be:app
     build:
       context: .
       dockerfile: Dockerfile.prod
     container_name: wizard-of-oz-be-web-1
-    command: >
-      uv run gunicorn config.wsgi:application
-      --workers 1 --threads 1
-      --max-requests 200 --max-requests-jitter 50
-      --timeout 30 --graceful-timeout 20 --keep-alive 5
-      --log-level warning
+    command:
+      - uv
+      - run
+      - gunicorn
+      - config.wsgi:application
+      - --worker-class
+      - gthread
+      - --workers
+      - "1"
+      - --threads
+      - "1"
+      - --max-requests
+      - "200"
+      - --max-requests-jitter
+      - "50"
+      - --timeout
+      - "30"
+      - --graceful-timeout
+      - "20"
+      - --keep-alive
+      - "3"          # keep-alive 더 짧게 → 커넥션 점유↓
+      - --log-level
+      - warning
     env_file:
       - .env.prod
+    environment:
+      <<: *py-memenv
     expose:
-      - "8000"                   # 내부 통신만, 외부 노출 X
-    depends_on:
-      - redis
-    healthcheck:
-      test: [ "CMD-SHELL", "curl -fsS http://127.0.0.1:8000/api/schema > /dev/null || exit 1" ]
-      interval: 15s
-      timeout: 5s
-      retries: 5
+      - "8000"       # 내부 통신만 (외부는 nginx:80)
+    healthcheck:     # 초미니 HTTP 헬스체크(슬래시 포함)
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8000/healthz/ >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
     deploy:
       resources:
-        limits: { memory: "350m" }
-        reservations: { memory: "250m" }
+        limits: { memory: "300m" }        # 살짝 더 타이트
+        reservations: { memory: "200m" }
+    logging: *tight-logging
 
+  # Celery worker + beat 통합(-B)
   worker:
-    build:
-      context: .
-      dockerfile: Dockerfile.prod
+    image: wizard-of-oz-be:app
     container_name: wizard-of-oz-be-worker-1
-    command: >
-      uv run celery -A config worker
-      --loglevel=warning
+    command:
+      - uv
+      - run
+      - celery
+      - -A
+      - config
+      - worker
+      - -B
+      - --loglevel
+      - warning        # 확인 끝났으니 warning으로 최소화
+      - --concurrency=1
+      - --prefetch-multiplier=1
+      - --max-tasks-per-child=100
     env_file:
       - .env.prod
+    environment:
+      <<: *py-memenv
+      # (선택) 환경변수로도 한 번 더 고정해두고 싶으면 주석 해제
+      # CELERY_WORKER_CONCURRENCY: "1"
+      # CELERYD_PREFETCH_MULTIPLIER: "1"
+      # CELERY_WORKER_MAX_TASKS_PER_CHILD: "100"
+      # CELERYD_FORCE_EXECV: "1"
     depends_on:
-      - redis
+      redis:
+        condition: service_started
     deploy:
       resources:
-        limits: { memory: "250m" }
+        limits: { memory: "240m" }   # worker+beat 합본 최소 제한
         reservations: { memory: "150m" }
+    logging: *tight-logging
 
-  beat:
-    build:
-      context: .
-      dockerfile: Dockerfile.prod
-    container_name: wizard-of-oz-be-beat-1
-    command: >
-      uv run celery -A config beat
-      --loglevel=warning
-    env_file:
-      - .env.prod
-    depends_on:
-      - redis
-    deploy:
-      resources:
-        limits: { memory: "1500m" }   # 100MiB 포화라 소폭 상향
-        reservations: { memory: "70m" }
-
+  # Celery 브로커 (최소 메모리 정책)
   redis:
     image: redis:7
     container_name: wizard-of-oz-be-redis-1
-    command: ["redis-server", "--appendonly", "no", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru"]
+    command: ["redis-server",
+      "--appendonly", "no",
+      "--maxmemory", "64mb",
+      "--maxmemory-policy", "allkeys-lru"]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
+      interval: 15s
       timeout: 3s
       retries: 5
     deploy:
       resources:
-        limits: { memory: "80m" }
-        reservations: { memory: "40m" }
+        limits: { memory: "64m" }
+        reservations: { memory: "32m" }
+    logging: *tight-logging
 
+  # 외부 노출은 nginx:80만 — web:8000은 내부로만
   nginx:
     image: nginx:alpine
     container_name: wizard-of-oz-be-nginx-1
     depends_on:
-      - web
+      web:
+        condition: service_healthy
     ports:
       - "80:80"
     volumes:
@@ -86,7 +129,6 @@ services:
       - ./:/app:ro
     deploy:
       resources:
-        limits: { memory: "64m" }
-        reservations: { memory: "32m" }
-
-# Compose v2: version 키 불필요
+        limits: { memory: "48m" }    # 더 타이트
+        reservations: { memory: "24m" }
+    logging: *tight-logging
