@@ -280,10 +280,9 @@ CELERY_RESULT_SERIALIZER = "json"
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 
 CELERY_BEAT_SCHEDULE = {
-    "poll-open-shipments-every-30s": {
+    "poll-open-shipments-every-120s": {
         "task": "domains.shipments.tasks.poll_open_shipments",
-        "schedule": 30.0,  # 30초마다
-        # "options": {"queue": "celery"},
+        "schedule": 120.0,
     },
 }
 
