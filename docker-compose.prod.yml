@@ -1,80 +1,92 @@
-
-version: "3.9"
-
 services:
-  db:
-    image: postgres:16
-    environment:
-      POSTGRES_DB: shopapi
-      POSTGRES_USER: shop
-      POSTGRES_PASSWORD: secret
-    volumes:
-      - dbdata:/var/lib/postgresql/data
-      
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U shop -d shopapi"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
-    restart: unless-stopped
-
-  redis:
-    image: redis:7
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
-
   web:
     build:
       context: .
       dockerfile: Dockerfile.prod
-    env_file: .env.prod
+    container_name: wizard-of-oz-be-web-1
+    command: >
+      uv run gunicorn config.wsgi:application
+      --workers 1 --threads 1
+      --max-requests 200 --max-requests-jitter 50
+      --timeout 30 --graceful-timeout 20 --keep-alive 5
+      --log-level warning
+    env_file:
+      - .env.prod
+    expose:
+      - "8000"                   # 내부 통신만, 외부 노출 X
     depends_on:
-      db: { condition: service_healthy }
-      redis: { condition: service_healthy }
-    ports:
-      - "8000:8000"
+      - redis
     healthcheck:
-      test: ["CMD-SHELL","curl -fsS http://localhost:8000/api/schema/ >/dev/null || exit 1"]
-      interval: 10s
-      timeout: 3s
-      retries: 20
-
-    restart: unless-stopped
+      test: [ "CMD-SHELL", "curl -fsS http://127.0.0.1:8000/api/schema > /dev/null || exit 1" ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits: { memory: "350m" }
+        reservations: { memory: "250m" }
 
   worker:
     build:
       context: .
-
       dockerfile: Dockerfile.prod
-    env_file: .env.prod
+    container_name: wizard-of-oz-be-worker-1
+    command: >
+      uv run celery -A config worker
+      --loglevel=warning
+    env_file:
+      - .env.prod
     depends_on:
-      db: { condition: service_healthy }
-      redis: { condition: service_healthy }
-    entrypoint: [ ]   # 이미지의 CMD만 있고 ENTRYPOINT는 없지만, 혹시 모를 잔재를 안전하게 제거
-    command: [ "uv", "run", "celery", "-A", "config", "worker", "-l", "info", "--concurrency=1" ]
-    restart: unless-stopped
+      - redis
+    deploy:
+      resources:
+        limits: { memory: "250m" }
+        reservations: { memory: "150m" }
 
   beat:
-    user: "1000:1000"
     build:
       context: .
       dockerfile: Dockerfile.prod
-    env_file: .env.prod
+    container_name: wizard-of-oz-be-beat-1
+    command: >
+      uv run celery -A config beat
+      --loglevel=warning
+    env_file:
+      - .env.prod
     depends_on:
-      db: { condition: service_healthy }
-      redis: { condition: service_healthy }
+      - redis
+    deploy:
+      resources:
+        limits: { memory: "1500m" }   # 100MiB 포화라 소폭 상향
+        reservations: { memory: "70m" }
+
+  redis:
+    image: redis:7
+    container_name: wizard-of-oz-be-redis-1
+    command: ["redis-server", "--appendonly", "no", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    deploy:
+      resources:
+        limits: { memory: "80m" }
+        reservations: { memory: "40m" }
+
+  nginx:
+    image: nginx:alpine
+    container_name: wizard-of-oz-be-nginx-1
+    depends_on:
+      - web
+    ports:
+      - "80:80"
     volumes:
-      - beat-data:/app/beat-data
-    entrypoint: [ ]
-    command: [ "uv", "run", "celery", "-A", "config", "beat", "-l", "info",
-                 "-s", "/app/beat-data/celerybeat-schedule" ]
-    restart: unless-stopped
+      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./:/app:ro
+    deploy:
+      resources:
+        limits: { memory: "64m" }
+        reservations: { memory: "32m" }
 
-
-volumes:
-  dbdata:
-  beat-data:
+# Compose v2: version 키 불필요

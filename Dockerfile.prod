@@ -1,32 +1,27 @@
-# ==== base ====
-FROM python:3.13-slim AS base
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl ca-certificates \
- && rm -rf /var/lib/apt/lists/* \
- && curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# ★ uv가 깔리는 경로를 PATH에 먼저 추가
-ENV PATH="/root/.local/bin:${PATH}"
+FROM python:3.13-slim
 
 WORKDIR /app
-COPY pyproject.toml uv.lock ./
+ENV PIP_NO_CACHE_DIR=1 PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \
+    MALLOC_ARENA_MAX=2
 
-# prod만 설치
-RUN uv sync --frozen --no-dev
+# 기본 유틸
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl ca-certificates && rm -rf /var/lib/apt/lists/*
 
-# venv PATH 등록 (런타임용)
-ENV VIRTUAL_ENV=/app/.venv
-ENV PATH="$VIRTUAL_ENV/bin:${PATH}"
+# uv 프로젝트 메타만 먼저 복사 → 종속성 설치
+COPY pyproject.toml uv.lock* ./
+RUN python -m pip install --upgrade pip && python -m pip install uv && \
+    uv sync --frozen --no-dev
 
+# 앱 복사
 COPY . .
+
+# 정적파일 (실서비스 아니어도 404 방지)
 RUN uv run python manage.py collectstatic --noinput || true
 
-RUN useradd -m appuser \
- && chown -R appuser:appuser /app \
- && chmod -R a+rX /app \
- && find /app/.venv/bin -type f -exec chmod a+x {} \;
-
+# 비루트 유저
+RUN useradd -m appuser && chown -R appuser:appuser /app
 USER appuser
+
+# 포트
 EXPOSE 8000
-CMD ["uv", "run", "gunicorn", "config.asgi:application", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000", "--workers", "2", "--timeout", "60"]
