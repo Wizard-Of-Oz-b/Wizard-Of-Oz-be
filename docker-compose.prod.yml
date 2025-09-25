@@ -21,8 +21,6 @@ services:
       dockerfile: Dockerfile.prod
     container_name: wizard-of-oz-be-web-1
     command:
-      - uv
-      - run
       - gunicorn
       - config.wsgi:application
       - --worker-class
@@ -60,6 +58,8 @@ services:
         reservations: { memory: "200m" }
     logging: *tight-logging
     networks: [appnet]
+    volumes:
+      - static_volume:/app/staticfiles
     restart: unless-stopped
 
   worker:
@@ -80,21 +80,10 @@ services:
       - |
         set -euo pipefail
         echo "[worker] booting…"
-
-        # 1) DNS 준비
-        until getent hosts redis >/dev/null 2>&1; do
-          echo "[worker] waiting DNS"; sleep 1;
-        done
-
-        # 2) TCP 오픈 대기 (패키지 없이 /dev/tcp 활용, 30초 제한)
-        timeout 30 bash -c '
-          until (</dev/tcp/redis/6379) 2>/dev/null; do
-            echo "[worker] waiting TCP"; sleep 1;
-          done
-        ' || { echo "[worker] TCP wait timeout"; exit 1; }
-
-        # 3) Celery 실행(PID1 교체)
-        exec uv run celery -A config worker -B --pool=solo --loglevel=warning \
+        until getent hosts redis >/dev/null 2>&1; do echo "[worker] waiting DNS"; sleep 1; done
+        timeout 30 bash -c 'until (</dev/tcp/redis/6379) 2>/dev/null; do echo "[worker] waiting TCP"; sleep 1; done' \
+          || { echo "[worker] TCP wait timeout"; exit 1; }
+        exec celery -A config worker -B --pool=solo --loglevel=warning \
           --concurrency=1 --prefetch-multiplier=1 --max-tasks-per-child=100
     deploy:
       resources:
@@ -128,16 +117,17 @@ services:
     restart: unless-stopped
 
   nginx:
-    image: nginx:alpine
     container_name: wizard-of-oz-be-nginx-1
+    build:
+      context: .
+      dockerfile: Dockerfile.nginx
     depends_on:
       web:
         condition: service_healthy
     ports:
       - "80:80"
     volumes:
-      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./:/app:ro                         # 정적/미디어 파일 서빙 시 사용
+      - static_volume:/app/staticfiles:ro
     deploy:
       resources:
         limits: { memory: "48m" }
@@ -148,3 +138,6 @@ services:
 
 networks:
   appnet:
+
+volumes:
+  static_volume: {}

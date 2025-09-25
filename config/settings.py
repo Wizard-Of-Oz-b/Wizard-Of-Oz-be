@@ -4,38 +4,32 @@ import os
 from pathlib import Path
 from datetime import timedelta
 from dotenv import load_dotenv
-from celery.schedules import crontab
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Base & Env (환경별 .env 자동 로딩)
-# ──────────────────────────────────────────────────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# DJANGO_ENV 에 따라 .env.<DJANGO_ENV> → .env 순서로 로드
-# 예) dev → .env.dev, prod → .env.prod
+# ──────────────────────────────────────────────────────────────────────────────
+# Env 로딩(간단 유지)
+# ──────────────────────────────────────────────────────────────────────────────
 DJANGO_ENV = os.getenv("DJANGO_ENV", "dev").strip().lower()
 env_file = BASE_DIR / f".env.{DJANGO_ENV}"
 if env_file.exists():
     load_dotenv(env_file, override=True)
-
-# 공통 키 보완용(.env). 이미 로드된 값은 유지(override=False)
 common_env = BASE_DIR / ".env"
 if common_env.exists():
     load_dotenv(common_env, override=False)
 
+def env_bool(k, default="0"):
+    return str(os.getenv(k, default)).strip().lower() in ("1","true","yes","on")
+
 # ──────────────────────────────────────────────────────────────────────────────
-# Core Settings
+# Core
 # ──────────────────────────────────────────────────────────────────────────────
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-secret")
-
-# "1/true/yes/on" 다 허용 (대소문자 무시)
-_DEBUG_RAW = os.getenv("DEBUG", "1")
-DEBUG = str(_DEBUG_RAW).strip().lower() in ("1", "true", "yes", "on")
-
-ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",")
+DEBUG = env_bool("DEBUG", "0")
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost,3.34.164.251").split(",")
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Applications
+# Apps
 # ──────────────────────────────────────────────────────────────────────────────
 INSTALLED_APPS = [
     # Django
@@ -45,17 +39,15 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "django_celery_beat",
-
     # 3rd party
+    "django_celery_beat",
     "rest_framework",
     "rest_framework_simplejwt",
     "rest_framework_simplejwt.token_blacklist",
     "django_filters",
     "drf_spectacular",
     "corsheaders",
-
-    # Domain apps
+    # Domain
     "domains.accounts",
     "domains.catalog",
     "domains.reviews",
@@ -77,41 +69,34 @@ MIDDLEWARE = [
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
-    # 다국어: SessionMiddleware 다음, CommonMiddleware 이전
     "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "config.middleware.ForceInsecureCSRFMiddleware",
 ]
 
-# ──────────────────────────────────────────────────────────────────────────────
-# URL & Templates
-# ──────────────────────────────────────────────────────────────────────────────
 ROOT_URLCONF = "config.urls"
 APPEND_SLASH = True
 
-TEMPLATES = [
-    {
-        "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [BASE_DIR / "templates"],
-        "APP_DIRS": True,
-        "OPTIONS": {
-            "context_processors": [
-                "django.template.context_processors.request",
-                "django.contrib.auth.context_processors.auth",
-                "django.contrib.messages.context_processors.messages",
-            ],
-        },
-    },
-]
+TEMPLATES = [{
+    "BACKEND": "django.template.backends.django.DjangoTemplates",
+    "DIRS": [BASE_DIR / "templates"],
+    "APP_DIRS": True,
+    "OPTIONS": {"context_processors": [
+        "django.template.context_processors.request",
+        "django.contrib.auth.context_processors.auth",
+        "django.contrib.messages.context_processors.messages",
+    ]},
+}]
 
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Database (PostgreSQL)
+# DB
 # ──────────────────────────────────────────────────────────────────────────────
 DATABASES = {
     "default": {
@@ -129,7 +114,7 @@ DATABASES = {
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Internationalization
+# I18N
 # ──────────────────────────────────────────────────────────────────────────────
 LANGUAGE_CODE = "ko-kr"
 TIME_ZONE = "Asia/Seoul"
@@ -139,7 +124,7 @@ LANGUAGES = [("ko", "Korean"), ("en", "English")]
 LOCALE_PATHS = [BASE_DIR / "locale"]
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Static & Media Files
+# Static / Media (WhiteNoise)
 # ──────────────────────────────────────────────────────────────────────────────
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
@@ -151,22 +136,14 @@ STORAGES = {
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
 }
 
-DEFAULT_PRODUCT_PLACEHOLDER_URL = "/static/img/product_placeholder.png"
-
 # ──────────────────────────────────────────────────────────────────────────────
-# DRF & OpenAPI
+# DRF / OpenAPI
 # ──────────────────────────────────────────────────────────────────────────────
 REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
-    ],
-    "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.AllowAny",
-    ],
+    "DEFAULT_AUTHENTICATION_CLASSES": ["rest_framework_simplejwt.authentication.JWTAuthentication"],
+    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.AllowAny"],
+    "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend"],
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
-    "DEFAULT_FILTER_BACKENDS": [
-        "django_filters.rest_framework.DjangoFilterBackend",
-    ],
 }
 
 SPECTACULAR_SETTINGS = {
@@ -177,27 +154,19 @@ SPECTACULAR_SETTINGS = {
     "SERVE_INCLUDE_SCHEMA": False,
     "COMPONENT_SPLIT_REQUEST": True,
     "SECURITY": [{"BearerAuth": []}],
-    "COMPONENTS": {
-        "securitySchemes": {
-            "BearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"},
-        }
-    },
+    "COMPONENTS": {"securitySchemes": {
+        "BearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"},
+    }},
     "DISABLE_ERRORS_AND_WARNINGS": True,
-    "SWAGGER_UI_SETTINGS": {
-        "deepLinking": True,
-        "displayRequestDuration": True,
-        "persistAuthorization": True,
-    },
+    "SWAGGER_UI_SETTINGS": {"deepLinking": True, "displayRequestDuration": True, "persistAuthorization": True},
     "SERVERS": [{"url": "/"}],
-    "ENUM_NAME_OVERRIDES": {
-        "Status": "ShipmentStatusEnum",
-        "LastEventStatus": "ShipmentLastEventStatusEnum",
-    },
+    "ENUM_NAME_OVERRIDES": {"Status": "ShipmentStatusEnum", "LastEventStatus": "ShipmentLastEventStatusEnum"},
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
-# JWT (SimpleJWT)
+# JWT
 # ──────────────────────────────────────────────────────────────────────────────
+from datetime import timedelta
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=int(os.getenv("ACCESS_MIN", "60"))),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=int(os.getenv("REFRESH_DAYS", "7"))),
@@ -207,17 +176,24 @@ SIMPLE_JWT = {
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Security, CORS & CSRF
+# Security / CORS / CSRF  (HTTP 운영 기준: Secure=False)
 # ──────────────────────────────────────────────────────────────────────────────
-COOKIE_SECURE = not DEBUG
-SESSION_COOKIE_SECURE = COOKIE_SECURE
-CSRF_COOKIE_SECURE = COOKIE_SECURE
+COOKIE_SECURE = False
+SESSION_COOKIE_SECURE = False
+CSRF_COOKIE_SECURE = False
 SESSION_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_SAMESITE = "Lax"
+SECURE_SSL_REDIRECT = False
+
+# ✅ 쿠키 CSRF 토큰을 쓰도록 고정(기존 True에서 False로 변경)
+CSRF_USE_SESSIONS = False  # ← 이것 때문에 쿠키 토큰이 막혔었음  # :contentReference[oaicite:6]{index=6}
+
+SECURE_PROXY_SSL_HEADER = None
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    "http://3.34.164.251",
 ]
 CORS_ALLOW_CREDENTIALS = True
 
@@ -227,49 +203,11 @@ CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000",
     "https://localhost:3000",
     "http://127.0.0.1:3000",
+    "http://3.34.164.251",
 ]
 
 # ──────────────────────────────────────────────────────────────────────────────
-# OAuth & 3rd Party Services
-# ──────────────────────────────────────────────────────────────────────────────
-SOCIAL_OAUTH = {
-    "google": {
-        "client_id": os.getenv("GOOGLE_CLIENT_ID", ""),
-        "client_secret": os.getenv("GOOGLE_CLIENT_SECRET", ""),
-        "redirect_uri": os.getenv("OAUTH_REDIRECT_URI", ""),
-        "token_url": "https://oauth2.googleapis.com/token",
-        "userinfo_url": "https://openidconnect.googleapis.com/v1/userinfo",
-    },
-    "naver": {
-        "client_id": os.getenv("NAVER_CLIENT_ID", ""),
-        "client_secret": os.getenv("NAVER_CLIENT_SECRET", ""),
-        "redirect_uri": os.getenv("OAUTH_REDIRECT_URI", ""),
-        "token_url": "https://nid.naver.com/oauth2.0/token",
-        "userinfo_url": "https://openapi.naver.com/v1/nid/me",
-    },
-    "kakao": {
-        "client_id": os.getenv("KAKAO_CLIENT_ID", ""),
-        "client_secret": os.getenv("KAKAO_CLIENT_SECRET", ""),
-        "redirect_uri": os.getenv("KAKAO_REDIRECT_URI", ""),
-        "token_url": "https://kauth.kakao.com/oauth/token",
-        "userinfo_url": "https://kapi.kakao.com/v2/user/me",
-    },
-}
-
-# Payment & Delivery Services
-TOSS_CLIENT_KEY = os.getenv("TOSS_CLIENT_KEY", "")
-TOSS_SECRET_KEY = os.getenv("TOSS_SECRET_KEY", "")
-SHIPMENTS_NOTIFY_WEBHOOK = os.getenv("SHIPMENTS_NOTIFY_WEBHOOK")
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Password Validation
-# ──────────────────────────────────────────────────────────────────────────────
-AUTH_PASSWORD_VALIDATORS = [
-    {"NAME": "domains.accounts.validators.PasswordComplexityValidator"},
-]
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Celery Configuration
+# Celery (원본 유지)
 # ──────────────────────────────────────────────────────────────────────────────
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://redis:6379/0")
 _result_env = os.environ.get("CELERY_RESULT_BACKEND")
