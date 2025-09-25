@@ -6,7 +6,7 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
-from domains.carts.models import Cart
+from domains.carts.models import Cart, CartItem
 from domains.carts.services import clear_cart as clear_cart_items  # 장바구니 비우기 헬퍼
 from domains.catalog.services import (
     reserve_stock,
@@ -84,7 +84,7 @@ def checkout_user_cart(user, *, clear_cart: bool = True) -> List[Purchase]:
         CartItem.objects.filter(cart_id=cart.id).delete()
 
     # 5) 생성된 구매 목록 재조회해서 반환 (PK 포함 보장)
-    purchases = list(Purchase.objects.filter(user=user, purchased_at__gte=now).order_by("purchased_at", "id"))
+    purchases = list(Purchase.objects.filter(user=user, purchased_at__gte=now).order_by("purchased_at", "purchase_id"))
     return purchases
 
 
