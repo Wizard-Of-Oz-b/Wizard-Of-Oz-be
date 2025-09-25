@@ -1,80 +1,143 @@
+# Compose v2 (version 키 불필요)
 
-version: "3.9"
+# 공통 로그 롤링
+x-logging: &tight-logging
+  driver: json-file
+  options:
+    max-size: "5m"
+    max-file: "2"
+
+# 파이썬/메모리 친화 env
+x-py-memenv: &py-memenv
+  MALLOC_ARENA_MAX: "2"
+  PYTHONDONTWRITEBYTECODE: "1"
+  PYTHONUNBUFFERED: "1"
 
 services:
-  db:
-    image: postgres:16
-    environment:
-      POSTGRES_DB: shopapi
-      POSTGRES_USER: shop
-      POSTGRES_PASSWORD: secret
-    volumes:
-      - dbdata:/var/lib/postgresql/data
-      
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U shop -d shopapi"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
-    restart: unless-stopped
-
-  redis:
-    image: redis:7
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
-
   web:
+    image: wizard-of-oz-be:app
     build:
       context: .
       dockerfile: Dockerfile.prod
-    env_file: .env.prod
-    depends_on:
-      db: { condition: service_healthy }
-      redis: { condition: service_healthy }
-    ports:
-      - "8000:8000"
+    container_name: wizard-of-oz-be-web-1
+    command:
+      - gunicorn
+      - config.wsgi:application
+      - --worker-class
+      - gthread
+      - --workers
+      - "1"
+      - --threads
+      - "1"
+      - --max-requests
+      - "200"
+      - --max-requests-jitter
+      - "50"
+      - --timeout
+      - "30"
+      - --graceful-timeout
+      - "20"
+      - --keep-alive
+      - "3"
+      - --log-level
+      - warning
+    env_file:
+      - .env.prod
+    environment:
+      <<: *py-memenv
+    expose:
+      - "8000"                               # 내부통신만 (외부는 nginx:80)
     healthcheck:
-      test: ["CMD-SHELL","curl -fsS http://localhost:8000/api/schema/ >/dev/null || exit 1"]
-      interval: 10s
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8000/healthz/ >/dev/null || exit 1"]
+      interval: 5s
       timeout: 3s
-      retries: 20
-
+      retries: 3
+    deploy:
+      resources:
+        limits: { memory: "300m" }
+        reservations: { memory: "200m" }
+    logging: *tight-logging
+    networks: [appnet]
+    volumes:
+      - static_volume:/app/staticfiles
     restart: unless-stopped
 
   worker:
-    build:
-      context: .
-
-      dockerfile: Dockerfile.prod
-    env_file: .env.prod
+    image: wizard-of-oz-be:app
+    container_name: wizard-of-oz-be-worker-1
+    env_file:
+      - .env.prod
+    environment:
+      MALLOC_ARENA_MAX: "2"
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
     depends_on:
-      db: { condition: service_healthy }
-      redis: { condition: service_healthy }
-    entrypoint: [ ]   # 이미지의 CMD만 있고 ENTRYPOINT는 없지만, 혹시 모를 잔재를 안전하게 제거
-    command: [ "uv", "run", "celery", "-A", "config", "worker", "-l", "info", "--concurrency=1" ]
+      redis:
+        condition: service_healthy
+    command:
+      - bash
+      - -lc
+      - |
+        set -euo pipefail
+        echo "[worker] booting…"
+        until getent hosts redis >/dev/null 2>&1; do echo "[worker] waiting DNS"; sleep 1; done
+        timeout 30 bash -c 'until (</dev/tcp/redis/6379) 2>/dev/null; do echo "[worker] waiting TCP"; sleep 1; done' \
+          || { echo "[worker] TCP wait timeout"; exit 1; }
+        exec celery -A config worker -B --pool=solo --loglevel=warning \
+          --concurrency=1 --prefetch-multiplier=1 --max-tasks-per-child=100
+    deploy:
+      resources:
+        limits: { memory: "240m" }
+        reservations: { memory: "150m" }
+    restart: unless-stopped
+    networks: [ appnet ]
+    logging:
+      driver: json-file
+      options: { max-size: "5m", max-file: "2" }
+
+  redis:
+    image: redis:7
+    container_name: wizard-of-oz-be-redis-1
+    command: ["redis-server",
+      "--appendonly", "no",
+      "--maxmemory", "64mb",
+      "--maxmemory-policy", "allkeys-lru"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 2s
+      retries: 10
+      start_period: 5s
+    deploy:
+      resources:
+        limits: { memory: "64m" }
+        reservations: { memory: "32m" }
+    logging: *tight-logging
+    networks: [appnet]
     restart: unless-stopped
 
-  beat:
-    user: "1000:1000"
+  nginx:
+    container_name: wizard-of-oz-be-nginx-1
     build:
       context: .
-      dockerfile: Dockerfile.prod
-    env_file: .env.prod
+      dockerfile: Dockerfile.nginx
     depends_on:
-      db: { condition: service_healthy }
-      redis: { condition: service_healthy }
+      web:
+        condition: service_healthy
+    ports:
+      - "80:80"
     volumes:
-      - beat-data:/app/beat-data
-    entrypoint: [ ]
-    command: [ "uv", "run", "celery", "-A", "config", "beat", "-l", "info",
-                 "-s", "/app/beat-data/celerybeat-schedule" ]
+      - static_volume:/app/staticfiles:ro
+    deploy:
+      resources:
+        limits: { memory: "48m" }
+        reservations: { memory: "24m" }
+    logging: *tight-logging
+    networks: [appnet]
     restart: unless-stopped
 
+networks:
+  appnet:
 
 volumes:
-  dbdata:
-  beat-data:
+  static_volume: {}
