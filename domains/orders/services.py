@@ -6,7 +6,7 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
-from domains.carts.models import Cart
+from domains.carts.models import Cart, CartItem
 from domains.carts.services import clear_cart as clear_cart_items  # 장바구니 비우기 헬퍼
 from domains.catalog.services import (
     reserve_stock,
@@ -32,7 +32,7 @@ def checkout_user_cart(user, *, clear_cart: bool = True) -> List[Purchase]:
     유저의 장바구니를 여러 건의 Purchase 레코드로 전환.
     - 모든 아이템 재고 확보 성공 시에만 생성(원자적)
     - 실패 시 전체 롤백
-    - 성공 시 장바구니 비우기(옵션)
+    - 성공 시 장바구니 비우기(옵션, 여기서 직접 삭제로 보증)
     """
     # 1) 카트 로드
     cart = (
@@ -46,8 +46,8 @@ def checkout_user_cart(user, *, clear_cart: bool = True) -> List[Purchase]:
     if not cart.items.exists():
         raise EmptyCartError({"cart": "장바구니에 담긴 상품이 없습니다."})
 
-    # 아이템 잠금 + 순서 고정(데드락 예방)
-    items_qs = (
+    # 아이템 잠금 + materialize (삭제 전 고정)
+    items = list(
         cart.items.select_related("product")
         .select_for_update()
         .order_by("product_id", "option_key")
@@ -55,34 +55,37 @@ def checkout_user_cart(user, *, clear_cart: bool = True) -> List[Purchase]:
 
     # 2) 재고 확보
     try:
-        for it in items_qs:
+        for it in items:
             reserve_stock(it.product_id, it.option_key or "", it.quantity)
     except (OutOfStockError, StockRowMissing) as e:
         raise ValidationError({"stock": str(e)})
 
     # 3) 구매 레코드 생성 (스냅샷 저장)
     now = timezone.now()
-    creates: List[Purchase] = []
-    for it in items_qs:
-        creates.append(
+    to_create: List[Purchase] = []
+    for it in items:
+        to_create.append(
             Purchase(
                 user=user,
                 product_id=it.product_id,
-                amount=it.quantity,          # 수량 스냅샷
-                unit_price=it.unit_price,    # 단가 스냅샷
-                options=it.options or {},    # 옵션 스냅샷(JSON)
+                amount=it.quantity,                         # 수량 스냅샷
+                unit_price=it.unit_price or it.product.price,  # 단가 스냅샷(빈 값 대비)
+                options=it.options or {},                   # 옵션 스냅샷(JSON)
                 option_key=it.option_key or "",
-                status=Purchase.STATUS_PAID,  # 기존 상태 체계 유지
+                status=Purchase.STATUS_PAID,
                 purchased_at=now,
             )
         )
-    Purchase.objects.bulk_create(creates)
+    # DB에 반영
+    Purchase.objects.bulk_create(to_create)
 
-    # 4) (옵션) 장바구니 비우기
+    # 4) 카트 비우기 (직접 삭제로 보증)
     if clear_cart:
-        clear_cart_items(cart)
+        CartItem.objects.filter(cart_id=cart.id).delete()
 
-    return creates
+    # 5) 생성된 구매 목록 재조회해서 반환 (PK 포함 보장)
+    purchases = list(Purchase.objects.filter(user=user, purchased_at__gte=now).order_by("purchased_at", "purchase_id"))
+    return purchases
 
 
 # ─────────────────────────────────────────────────────────────────────────────

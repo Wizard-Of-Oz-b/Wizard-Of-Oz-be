@@ -66,7 +66,7 @@ def add_or_update_item(
     option_key = make_option_key(options)
 
     if unit_price is None:
-        unit_price = product.price
+        unit_price = Decimal(str(product.price))
 
     item, created = CartItem.objects.select_for_update().get_or_create(
         cart=cart,

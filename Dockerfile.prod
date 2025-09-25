@@ -1,27 +1,36 @@
+# Production Dockerfile (web)
 FROM python:3.13-slim
 
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
 WORKDIR /app
-ENV PIP_NO_CACHE_DIR=1 PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \
-    MALLOC_ARENA_MAX=2
 
-# 기본 유틸
+# build deps for psycopg2, Pillow
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl ca-certificates && rm -rf /var/lib/apt/lists/*
+    build-essential libpq-dev libjpeg62-turbo-dev zlib1g-dev curl ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
 
-# uv 프로젝트 메타만 먼저 복사 → 종속성 설치
-COPY pyproject.toml uv.lock* ./
-RUN python -m pip install --upgrade pip && python -m pip install uv && \
-    uv sync --frozen --no-dev
+# Python deps via pyproject
+COPY pyproject.toml /app/pyproject.toml
+RUN python -m pip install --upgrade pip setuptools wheel \
+ && pip install -e . \
+ && pip install gunicorn whitenoise
 
-# 앱 복사
-COPY . .
+# project source
+COPY . /app
 
-# 정적파일 (실서비스 아니어도 404 방지)
-RUN uv run python manage.py collectstatic --noinput || true
+# runtime env (HTTP 기준 – HTTPS 전환 시 settings에서 변경)
+ENV DJANGO_SETTINGS_MODULE=config.settings \
+    DEBUG=0 \
+    ALLOWED_HOSTS=3.34.164.251,localhost,127.0.0.1 \
+    SESSION_COOKIE_SECURE=0 \
+    CSRF_COOKIE_SECURE=0 \
+    SECURE_SSL_REDIRECT=0
 
-# 비루트 유저
-RUN useradd -m appuser && chown -R appuser:appuser /app
-USER appuser
+# collectstatic at build (실패 시 빌드 계속)
+RUN python manage.py collectstatic --noinput || true
 
-# 포트
 EXPOSE 8000
+CMD ["gunicorn","config.wsgi:application","--bind","0.0.0.0:8000","--workers","3","--threads","3","--timeout","60"]
