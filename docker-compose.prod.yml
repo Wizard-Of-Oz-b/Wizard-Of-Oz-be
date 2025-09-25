@@ -1,20 +1,19 @@
-# Compose v2: version 키 불필요
+# Compose v2 (version 키 불필요)
 
-# 공통 로그 롤링(디스크 폭주 방지, RAM 영향 거의 無)
+# 공통 로그 롤링
 x-logging: &tight-logging
   driver: json-file
   options:
     max-size: "5m"
     max-file: "2"
 
-# 공통 파이썬/메모리 친화 env
+# 파이썬/메모리 친화 env
 x-py-memenv: &py-memenv
-  MALLOC_ARENA_MAX: "2"     # glibc arena 과다 할당 방지
+  MALLOC_ARENA_MAX: "2"
   PYTHONDONTWRITEBYTECODE: "1"
   PYTHONUNBUFFERED: "1"
 
 services:
-  # ⬇️ 여기서만 build → 결과 이미지를 모든 서비스가 재사용
   web:
     image: wizard-of-oz-be:app
     build:
@@ -41,7 +40,7 @@ services:
       - --graceful-timeout
       - "20"
       - --keep-alive
-      - "3"          # keep-alive 더 짧게 → 커넥션 점유↓
+      - "3"
       - --log-level
       - warning
     env_file:
@@ -49,54 +48,64 @@ services:
     environment:
       <<: *py-memenv
     expose:
-      - "8000"       # 내부 통신만 (외부는 nginx:80)
-    healthcheck:     # 초미니 HTTP 헬스체크(슬래시 포함)
+      - "8000"                               # 내부통신만 (외부는 nginx:80)
+    healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8000/healthz/ >/dev/null || exit 1"]
-      interval: 30s
+      interval: 5s
       timeout: 3s
       retries: 3
     deploy:
       resources:
-        limits: { memory: "300m" }        # 살짝 더 타이트
+        limits: { memory: "300m" }
         reservations: { memory: "200m" }
     logging: *tight-logging
+    networks: [appnet]
+    restart: unless-stopped
 
-  # Celery worker + beat 통합(-B)
   worker:
     image: wizard-of-oz-be:app
     container_name: wizard-of-oz-be-worker-1
-    command:
-      - uv
-      - run
-      - celery
-      - -A
-      - config
-      - worker
-      - -B
-      - --loglevel
-      - warning        # 확인 끝났으니 warning으로 최소화
-      - --concurrency=1
-      - --prefetch-multiplier=1
-      - --max-tasks-per-child=100
     env_file:
       - .env.prod
     environment:
-      <<: *py-memenv
-      # (선택) 환경변수로도 한 번 더 고정해두고 싶으면 주석 해제
-      # CELERY_WORKER_CONCURRENCY: "1"
-      # CELERYD_PREFETCH_MULTIPLIER: "1"
-      # CELERY_WORKER_MAX_TASKS_PER_CHILD: "100"
-      # CELERYD_FORCE_EXECV: "1"
+      MALLOC_ARENA_MAX: "2"
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
     depends_on:
       redis:
-        condition: service_started
+        condition: service_healthy
+    command:
+      - bash
+      - -lc
+      - |
+        set -euo pipefail
+        echo "[worker] booting…"
+
+        # 1) DNS 준비
+        until getent hosts redis >/dev/null 2>&1; do
+          echo "[worker] waiting DNS"; sleep 1;
+        done
+
+        # 2) TCP 오픈 대기 (패키지 없이 /dev/tcp 활용, 30초 제한)
+        timeout 30 bash -c '
+          until (</dev/tcp/redis/6379) 2>/dev/null; do
+            echo "[worker] waiting TCP"; sleep 1;
+          done
+        ' || { echo "[worker] TCP wait timeout"; exit 1; }
+
+        # 3) Celery 실행(PID1 교체)
+        exec uv run celery -A config worker -B --pool=solo --loglevel=warning \
+          --concurrency=1 --prefetch-multiplier=1 --max-tasks-per-child=100
     deploy:
       resources:
-        limits: { memory: "240m" }   # worker+beat 합본 최소 제한
+        limits: { memory: "240m" }
         reservations: { memory: "150m" }
-    logging: *tight-logging
+    restart: unless-stopped
+    networks: [ appnet ]
+    logging:
+      driver: json-file
+      options: { max-size: "5m", max-file: "2" }
 
-  # Celery 브로커 (최소 메모리 정책)
   redis:
     image: redis:7
     container_name: wizard-of-oz-be-redis-1
@@ -106,16 +115,18 @@ services:
       "--maxmemory-policy", "allkeys-lru"]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 15s
-      timeout: 3s
-      retries: 5
+      interval: 3s
+      timeout: 2s
+      retries: 10
+      start_period: 5s
     deploy:
       resources:
         limits: { memory: "64m" }
         reservations: { memory: "32m" }
     logging: *tight-logging
+    networks: [appnet]
+    restart: unless-stopped
 
-  # 외부 노출은 nginx:80만 — web:8000은 내부로만
   nginx:
     image: nginx:alpine
     container_name: wizard-of-oz-be-nginx-1
@@ -126,9 +137,14 @@ services:
       - "80:80"
     volumes:
       - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./:/app:ro
+      - ./:/app:ro                         # 정적/미디어 파일 서빙 시 사용
     deploy:
       resources:
-        limits: { memory: "48m" }    # 더 타이트
+        limits: { memory: "48m" }
         reservations: { memory: "24m" }
     logging: *tight-logging
+    networks: [appnet]
+    restart: unless-stopped
+
+networks:
+  appnet:
