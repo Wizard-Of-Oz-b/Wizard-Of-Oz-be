@@ -31,10 +31,11 @@ class WishlistItemWriteSerializer(serializers.ModelSerializer):
     product_id = serializers.UUIDField()
     option_key = serializers.CharField(required=False, allow_blank=True, default="")
     options    = serializers.JSONField(required=False, default=dict)
+    wishlist_id = serializers.UUIDField(read_only=True)
 
     class Meta:
         model  = WishlistItem
-        fields = ("product_id","option_key","options")
+        fields = ("wishlist_id","product_id","option_key","options")
 
     def validate_product_id(self, v):
         if not Product.objects.filter(pk=v).exists():

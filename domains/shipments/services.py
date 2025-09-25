@@ -111,8 +111,8 @@ def upsert_events_from_adapter(payload: Dict[str, Any]) -> int:
 
     latest_dt = None
     latest_status = None
-    latest_loc = None
-    latest_desc = None
+    latest_loc = ""
+    latest_desc = ""
 
     for e in events:
         status = _norm_status(e.get("status"))
@@ -155,18 +155,19 @@ def upsert_events_from_adapter(payload: Dict[str, Any]) -> int:
         if (latest_dt is None) or (dt > latest_dt):
             latest_dt = dt
             latest_status = status or None
-            latest_loc = location or None
-            latest_desc = description or None
+            # DB가 NOT NULL이면 빈 문자열로 보관
+            latest_loc = location or ""
+            latest_desc = description or ""
 
     # 최신 이벤트 스냅샷/last_synced_at
     if latest_dt:
         Shipment.objects.filter(id=shipment.id).update(
             last_event_at=latest_dt,
             last_event_status=latest_status,
-            last_event_loc=latest_loc,
-            last_event_desc=latest_desc,
+            last_event_loc=latest_loc or "",
+            last_event_desc=latest_desc or "",
             last_synced_at=timezone.now(),
-        )
+            )
 
     # 전체 상태 재계산
     new_status = _recompute_status_from_events(shipment)
