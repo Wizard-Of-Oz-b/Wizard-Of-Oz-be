@@ -1,12 +1,13 @@
 # api/v1/urls.py
 from django.urls import path, include
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from rest_framework_simplejwt.views import TokenRefreshView
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
+from domains.accounts.jwt import EmailTokenObtainPairView  # ← 커스텀 토큰 뷰
 
 urlpatterns = [
     # --- Auth ---
     path("auth/", include(("domains.accounts.urls_auth", "accounts_auth"))),
-    path("auth/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
+    path("auth/token/", EmailTokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("auth/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
 
     # --- Users ---
@@ -37,9 +38,9 @@ urlpatterns = [
     # --- Admin (관리자 API) ---
     # 여기 안에 users/categories/products/product-stocks/product-images/orders 등이 라우터로 등록됨
     path("admin/", include(("domains.staff.urls_admin", "staff_admin"))),
-    path("", include("domains.wishlists.urls")),
 
+    # --- Others ---
+    path("", include("domains.wishlists.urls")),
     path("", include("domains.accounts.urls_addresses")),
     path("", include("domains.orders.urls_shipping")),
-
 ]

@@ -6,6 +6,7 @@ from .views import (
     CartItemDeleteByProductOptionAPI,
     CartItemDetailView,
     CartItemQuantityView,   # ← 수량 변경
+    CartItemUpdateView,     # ← 수량 + 옵션 변경
     CartClearView,          # ← 전체 비우기
 )
 
@@ -21,6 +22,9 @@ urlpatterns = [
 
     # 아이템 수량 변경 (PATCH body: {"quantity": n})
     path("items/<uuid:item_id>/quantity/", CartItemQuantityView.as_view(), name="cartitem-quantity"),
+
+    # 아이템 수량 + 옵션 변경 (PATCH body: {"quantity": n, "option_key": "str", "options": {}})
+    path("items/<uuid:item_id>/update/", CartItemUpdateView.as_view(), name="cartitem-update"),
 
     # 상품+옵션키로 특정 라인 삭제 (옵션 없는 경우 option_key="")
     path(
