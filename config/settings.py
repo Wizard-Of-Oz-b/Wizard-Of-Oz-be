@@ -23,7 +23,9 @@ common_env = BASE_DIR / ".env"
 if common_env.exists():
     load_dotenv(common_env, override=False)
 
-# 2) 여기서 바로 환경변수 읽기
+# ──────────────────────────────────────────────────────────────────────────────
+# Core Settings
+# ──────────────────────────────────────────────────────────────────────────────
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-secret")
 
 # "1/true/yes/on" 다 허용 (대소문자 무시)
@@ -32,6 +34,7 @@ DEBUG = str(_DEBUG_RAW).strip().lower() in ("1", "true", "yes", "on")
 
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",")
 
+# ──────────────────────────────────────────────────────────────────────────────
 # Applications
 # ──────────────────────────────────────────────────────────────────────────────
 INSTALLED_APPS = [
@@ -77,14 +80,17 @@ MIDDLEWARE = [
     # 다국어: SessionMiddleware 다음, CommonMiddleware 이전
     "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
-
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
+# ──────────────────────────────────────────────────────────────────────────────
+# URL & Templates
+# ──────────────────────────────────────────────────────────────────────────────
 ROOT_URLCONF = "config.urls"
+APPEND_SLASH = True
 
 TEMPLATES = [
     {
@@ -104,64 +110,55 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
+# ──────────────────────────────────────────────────────────────────────────────
 # Database (PostgreSQL)
-def env_multi(*keys, default=None):
-    for k in keys:
-        v = os.getenv(k)
-        if v:
-            return v
-    return default
-
-# DATABASES = {
-#     "default": {
-#         "ENGINE": "django.db.backends.postgresql",
-#         "NAME": env_multi("DB_NAME", "POSTGRES_DB", default="shopapi"),
-#         "USER": env_multi("DB_USER", "POSTGRES_USER", default="postgres"),
-#         "PASSWORD": env_multi("DB_PASSWORD", "POSTGRES_PASSWORD", default=""),
-#         "HOST": env_multi("DB_HOST", "POSTGRES_HOST", default="db"),
-#         "PORT": env_multi("DB_PORT", "POSTGRES_PORT", default="5432"),
-#     }
-# }
-
+# ──────────────────────────────────────────────────────────────────────────────
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "HOST": os.getenv("DB_HOST", "localhost"),
+        "NAME": os.getenv("DB_NAME"),
+        "USER": os.getenv("DB_USER"),
+        "PASSWORD": os.getenv("DB_PASSWORD"),
+        "HOST": os.getenv("DB_HOST"),
         "PORT": os.getenv("DB_PORT", "5432"),
-        "NAME": os.getenv("DB_NAME", "django"),
-        "USER": os.getenv("DB_USER", "postgres"),
-        "PASSWORD": os.getenv("DB_PASSWORD", "postgres"),
+        "CONN_MAX_AGE": int(os.getenv("DJANGO_DB_CONN_MAX_AGE", "60")),
+        "OPTIONS": {"sslmode": os.getenv("DJANGO_DB_SSLMODE", "require")},
     }
 }
 
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
 # ──────────────────────────────────────────────────────────────────────────────
-# Internationalization (ko/en)
+# Internationalization
 # ──────────────────────────────────────────────────────────────────────────────
-LANGUAGE_CODE = "ko-kr"          # 폴백 언어
+LANGUAGE_CODE = "ko-kr"
 TIME_ZONE = "Asia/Seoul"
 USE_I18N = True
 USE_TZ = True
 LANGUAGES = [("ko", "Korean"), ("en", "English")]
 LOCALE_PATHS = [BASE_DIR / "locale"]
 
-# Static / Media
+# ──────────────────────────────────────────────────────────────────────────────
+# Static & Media Files
+# ──────────────────────────────────────────────────────────────────────────────
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
-
-DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
 }
 
+DEFAULT_PRODUCT_PLACEHOLDER_URL = "/static/img/product_placeholder.png"
+
+# ──────────────────────────────────────────────────────────────────────────────
 # DRF & OpenAPI
+# ──────────────────────────────────────────────────────────────────────────────
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework_simplejwt.authentication.JWTAuthentication",
-        # 필요 시 "rest_framework.authentication.SessionAuthentication"
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.AllowAny",
@@ -185,9 +182,7 @@ SPECTACULAR_SETTINGS = {
             "BearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"},
         }
     },
-    # ✅ 필드 경로만 사용 (클래스 경로 전부 삭제!)
     "DISABLE_ERRORS_AND_WARNINGS": True,
-
     "SWAGGER_UI_SETTINGS": {
         "deepLinking": True,
         "displayRequestDuration": True,
@@ -202,17 +197,18 @@ SPECTACULAR_SETTINGS = {
 
 # ──────────────────────────────────────────────────────────────────────────────
 # JWT (SimpleJWT)
+# ──────────────────────────────────────────────────────────────────────────────
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=int(os.getenv("ACCESS_MIN", "60"))),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=int(os.getenv("REFRESH_DAYS", "7"))),
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
     "AUTH_HEADER_TYPES": ("Bearer",),
-    # 운영에서 키는 반드시 .env 로 관리
-    # "SIGNING_KEY": SECRET_KEY,  # 기본은 Django SECRET_KEY 사용
 }
 
-# Security / CORS / CSRF
+# ──────────────────────────────────────────────────────────────────────────────
+# Security, CORS & CSRF
+# ──────────────────────────────────────────────────────────────────────────────
 COOKIE_SECURE = not DEBUG
 SESSION_COOKIE_SECURE = COOKIE_SECURE
 CSRF_COOKIE_SECURE = COOKIE_SECURE
@@ -233,7 +229,9 @@ CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1:3000",
 ]
 
-# OAuth / 3rd Party
+# ──────────────────────────────────────────────────────────────────────────────
+# OAuth & 3rd Party Services
+# ──────────────────────────────────────────────────────────────────────────────
 SOCIAL_OAUTH = {
     "google": {
         "client_id": os.getenv("GOOGLE_CLIENT_ID", ""),
@@ -258,19 +256,24 @@ SOCIAL_OAUTH = {
     },
 }
 
+# Payment & Delivery Services
 TOSS_CLIENT_KEY = os.getenv("TOSS_CLIENT_KEY", "")
 TOSS_SECRET_KEY = os.getenv("TOSS_SECRET_KEY", "")
+SHIPMENTS_NOTIFY_WEBHOOK = os.getenv("SHIPMENTS_NOTIFY_WEBHOOK")
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Password Validation
+# ──────────────────────────────────────────────────────────────────────────────
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "domains.accounts.validators.PasswordComplexityValidator"},
-    # (원하면 추가) {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
-    # (원하면 추가) {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
-    # MinimumLength/Numeric은 우리 커스텀에 포함되어 있으니 보통 안 넣습니다.
 ]
 
-# Celery
-CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://redis:6379/0")
-CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND", CELERY_BROKER_URL)
+# ──────────────────────────────────────────────────────────────────────────────
+# Celery Configuration
+# ──────────────────────────────────────────────────────────────────────────────
+CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://redis:6379/0")
+_result_env = os.environ.get("CELERY_RESULT_BACKEND")
+CELERY_RESULT_BACKEND = _result_env or None
 CELERY_TIMEZONE = "Asia/Seoul"
 CELERY_TASK_TIME_LIMIT = 60 * 10
 CELERY_TASK_TRACK_STARTED = True
@@ -278,18 +281,13 @@ CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_TASK_IGNORE_RESULT = True
 
 CELERY_BEAT_SCHEDULE = {
     "poll-shipments-every-2min": {
-        "task": "domains.shipments.tasks.poll_open_shipments",  # 너희 태스크 경로
-        "schedule": 120.0,  # 2분마다 (또는 crontab(minute="*/2"))
-        "args": [],         # 필요시 인자
-        "kwargs": {},       # 필요시 키워드 인자
+        "task": "domains.shipments.tasks.poll_open_shipments",
+        "schedule": 120.0,
+        "args": [],
+        "kwargs": {},
     },
 }
-
-DEFAULT_PRODUCT_PLACEHOLDER_URL = "/static/img/product_placeholder.png"
-
-SHIPMENTS_NOTIFY_WEBHOOK = os.getenv("SHIPMENTS_NOTIFY_WEBHOOK")
-
-APPEND_SLASH = True
