@@ -8,6 +8,7 @@ from .views import (
     PurchaseRefundAPI,
     CheckoutView, CheckoutAPI, OrderItemDetailAPI, OrderItemListAPI,
 )
+from .views_shipping import UpdateAllReadyOrdersShippingAddressAPI
 
 urlpatterns = [
     # Purchases
@@ -18,8 +19,11 @@ urlpatterns = [
     path("purchases/<uuid:purchase_id>/cancel/", PurchaseCancelAPI.as_view(), name="purchase-cancel"),
     path("purchases/<uuid:purchase_id>/refund/", PurchaseRefundAPI.as_view(), name="purchase-refund"),
 
-    # Checkout
-    path("checkout/", CheckoutAPI.as_view(), name="checkout"),
+    # Checkout (moved to urls_shipping.py)
+    
+    # Shipping Address
+    path("purchases/update-all-ready-shipping-address/", UpdateAllReadyOrdersShippingAddressAPI.as_view(), name="update-all-ready-shipping-address"),
+    
 # OrderItem 조회
     path("purchases/<uuid:purchase_id>/items/", OrderItemListAPI.as_view(), name="orderitem-list-by-order"),
     path("order-items/<uuid:item_id>/", OrderItemDetailAPI.as_view(), name="orderitem-detail"),
