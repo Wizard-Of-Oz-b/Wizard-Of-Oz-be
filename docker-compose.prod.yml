@@ -45,6 +45,8 @@ services:
       - .env.prod
     environment:
       <<: *py-memenv
+      SMARTPARCEL_HOST: "http://54.249.36.97:8080"
+      SMARTPARCEL_API_KEY: "${SMARTPARCEL_API_KEY}"
     expose:
       - "8000"                               # 내부통신만 (외부는 nginx:80)
     healthcheck:
@@ -71,6 +73,9 @@ services:
       MALLOC_ARENA_MAX: "2"
       PYTHONDONTWRITEBYTECODE: "1"
       PYTHONUNBUFFERED: "1"
+      SMARTPARCEL_HOST: "http://54.249.36.97:8080"
+      SMARTPARCEL_API_KEY: "${SMARTPARCEL_API_KEY}"
+
     depends_on:
       redis:
         condition: service_healthy
