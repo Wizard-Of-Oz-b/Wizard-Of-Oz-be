@@ -13,6 +13,7 @@ class PurchaseReadSerializer(serializers.ModelSerializer):
         fields = (
             "purchase_id", "user", "product", "product_name",
             "amount", "unit_price", "options", "option_key",
+            "items_total",  # 상품 총액만 포함
             "status", "purchased_at", "pg", "pg_tid",
         )
         read_only_fields = ("purchase_id", "status", "purchased_at", "product_name")

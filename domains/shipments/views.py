@@ -1,6 +1,7 @@
 # domains/shipments/views.py
 from typing import Any, Dict, List
-
+import os, logging, requests
+from rest_framework import views
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
 from rest_framework import status, parsers, permissions
@@ -200,3 +201,59 @@ class ShipmentWebhookAPI(APIView):
 
         created_cnt = upsert_events_from_adapter(ser.validated_data)
         return Response({"created": created_cnt}, status=status.HTTP_200_OK)
+
+
+logger = logging.getLogger(__name__)
+
+class ShipmentTrackAPI(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        carrier = (request.query_params.get("carrier") or "").strip()
+        invoice = (request.query_params.get("invoice") or "").strip()
+
+        if not carrier or not invoice:
+            return Response(
+                {"detail": "carrier, invoice 쿼리 스트링이 필요합니다."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        host = os.getenv("SMARTPARCEL_HOST", "").rstrip("/")
+        if not host:
+            logger.error("SMARTPARCEL_HOST env가 비어 있음")
+            return Response({"detail": "SMARTPARCEL_HOST 미설정"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        url = f"{host}/track"
+        params = {"carrier": carrier, "invoice": invoice}
+        headers = {"Accept": "application/json"}
+
+        try:
+            resp = requests.get(url, params=params, headers=headers, timeout=10)
+            # 200~299만 통과, 나머지는 그대로 프록시 상태코드/본문 전달
+            if not (200 <= resp.status_code < 300):
+                logger.warning("Proxy non-2xx: %s %s", resp.status_code, resp.text[:500])
+                # JSON이면 그대로, 아니면 메시지 감싸서 반환
+                try:
+                    data = resp.json()
+                except Exception:
+                    data = {"detail": "upstream error", "status_code": resp.status_code, "body": resp.text[:500]}
+                return Response(data, status=resp.status_code)
+
+            # 정상
+            try:
+                data = resp.json()
+            except Exception as e:
+                logger.exception("Proxy JSON 디코드 실패: %s", e)
+                return Response({"detail": "invalid upstream json"}, status=status.HTTP_502_BAD_GATEWAY)
+
+            return Response(data, status=status.HTTP_200_OK)
+
+        except requests.Timeout:
+            logger.exception("Proxy timeout")
+            return Response({"detail": "upstream timeout"}, status=status.HTTP_504_GATEWAY_TIMEOUT)
+        except requests.RequestException as e:
+            logger.exception("Proxy request error: %s", e)
+            return Response({"detail": "upstream request error"}, status=status.HTTP_502_BAD_GATEWAY)
+        except Exception as e:
+            logger.exception("예상치 못한 서버 오류: %s", e)
+            return Response({"detail": "internal error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
