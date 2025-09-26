@@ -23,6 +23,7 @@ urlpatterns = [
     path("reviews/", include(("domains.reviews.urls", "reviews"))),  # 개별 리뷰 상세용
 
     # --- Orders ---
+    path("orders/", include(("domains.orders.urls_shipping", "orders_shipping"))),  # shipping URLs with orders/ prefix
     path("orders/", include(("domains.orders.urls", "orders"))),
 
     # --- Payments ---
@@ -42,5 +43,4 @@ urlpatterns = [
     # --- Others ---
     path("", include("domains.wishlists.urls")),
     path("", include("domains.accounts.urls_addresses")),
-    path("", include("domains.orders.urls_shipping")),
 ]
