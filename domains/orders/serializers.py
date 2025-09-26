@@ -4,6 +4,7 @@ from domains.orders.utils import parse_option_key_safe
 from rest_framework import serializers
 from .models import Purchase, OrderItem
 
+
 class PurchaseReadSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source="product.name", read_only=True)
 
@@ -12,6 +13,7 @@ class PurchaseReadSerializer(serializers.ModelSerializer):
         fields = (
             "purchase_id", "user", "product", "product_name",
             "amount", "unit_price", "options", "option_key",
+            "items_total",  # 상품 총액만 포함
             "status", "purchased_at", "pg", "pg_tid",
         )
         read_only_fields = ("purchase_id", "status", "purchased_at", "product_name")
@@ -63,3 +65,20 @@ class OrderItemReadSerializer(serializers.ModelSerializer):
     def get_line_total(self, obj):
         # 모델 프로퍼티 있어도 직렬화에서 보장
         return (obj.unit_price or 0) * (obj.quantity or 0) - (obj.line_discount or 0) + (obj.line_tax or 0)
+# domains/orders/serializers.py
+
+
+class OrderItemMiniSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OrderItem
+        fields = ["product", "quantity", "unit_price", "option_key"]  # 필드명 프로젝트에 맞게
+
+class PurchaseOutSerializer(serializers.Serializer):
+    # 테스트가 기대하는 top-level id 제공
+    id = serializers.UUIDField()
+    order_id = serializers.UUIDField()
+    amount = serializers.CharField()
+    order_number = serializers.CharField(required=False)  # 있으면 포함
+    payment_id = serializers.UUIDField(required=False)
+    receipt_url = serializers.CharField(required=False, allow_null=True)
+    items = OrderItemMiniSerializer(many=True)
