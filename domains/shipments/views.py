@@ -1,6 +1,7 @@
 # domains/shipments/views.py
 from typing import Any, Dict, List
-
+import os, logging, requests
+from rest_framework import views
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
 from rest_framework import status, parsers, permissions
@@ -200,3 +201,56 @@ class ShipmentWebhookAPI(APIView):
 
         created_cnt = upsert_events_from_adapter(ser.validated_data)
         return Response({"created": created_cnt}, status=status.HTTP_200_OK)
+
+class ShipmentTrackAPI(views.APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(name="carrier", required=False, type=str, description="택배사 코드(예: 04)"),
+            OpenApiParameter(name="invoice", required=True, type=str, description="운송장 번호"),
+        ],
+        responses={200: dict},
+    )
+    def get(self, request):
+        carrier = request.query_params.get("carrier")
+        invoice = request.query_params.get("invoice")
+
+        if not invoice:
+            return Response({"detail": "invoice는 필수입니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+        host = os.getenv("SMARTPARCEL_HOST", "").rstrip("/")
+        if not host:
+            logging.error("SMARTPARCEL_HOST not set")
+            return Response({"detail": "연동 설정 누락(SMARTPARCEL_HOST)"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        url = f"{host}/track"
+        params = {"invoice": invoice}
+        if carrier:
+            params["carrier"] = carrier
+
+        try:
+            resp = requests.get(url, params=params, timeout=8)
+        except requests.Timeout:
+            logging.exception("sweettracker_timeout")
+            return Response({"detail": "연동 타임아웃"}, status=status.HTTP_504_GATEWAY_TIMEOUT)
+        except Exception:
+            logging.exception("sweettracker_unhandled")
+            return Response({"detail": "연동 중 알 수 없는 오류"}, status=status.HTTP_502_BAD_GATEWAY)
+
+        if resp.status_code != 200:
+            logging.warning("sweettracker_non200 status=%s body_head=%r", resp.status_code, resp.text[:300])
+            return Response(
+                {"detail": "연동 실패", "upstream_status": resp.status_code},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        # JSON 방어
+        try:
+            data = resp.json()
+        except Exception:
+            logging.exception("sweettracker_invalid_json")
+            return Response({"detail": "연동 응답이 JSON이 아닙니다."}, status=status.HTTP_502_BAD_GATEWAY)
+
+        # 가공 없이 패스스루
+        return Response(data, status=status.HTTP_200_OK)
