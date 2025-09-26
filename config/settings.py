@@ -281,6 +281,15 @@ CELERY_BEAT_SCHEDULE = {
     },
 }
 
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "loggers": {
+        "django.request": {"handlers": ["console"], "level": "ERROR", "propagate": True},
+        "": {"handlers": ["console"], "level": "INFO"},
+    },
+}
 
 DEFAULT_PRODUCT_PLACEHOLDER_URL = "/static/img/product_placeholder.png"
 
