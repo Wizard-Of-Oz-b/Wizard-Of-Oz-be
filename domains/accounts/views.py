@@ -72,11 +72,13 @@ class RefreshView(APIView):
         try:
             refresh = RefreshToken(token)
             new_access = str(refresh.access_token)
-            user = User.objects.get(id=refresh["user_id"])
-            new_refresh = RefreshToken.for_user(user)
 
-            resp = Response({"access": new_access, "refresh": str(new_refresh)}, status=200)
-            resp.set_cookie("refresh", str(new_refresh), **refresh_cookie_kwargs(settings.DEBUG))
+            # ✅ Fixed 방식: 새로운 Access Token만 발급 (Refresh Token은 그대로 유지)
+            resp = Response({"access": new_access}, status=200)
+
+            # ✅ 쿠키 재설정 없음 (기존 Refresh Token 그대로 유지)
+            # resp.set_cookie(...) 제거
+
             return resp
         except Exception:
             return Response({"detail": "Invalid refresh"}, status=401)
