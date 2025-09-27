@@ -7,8 +7,7 @@ from domains.orders.models import Purchase
 
 
 class ReviewReadSerializer(serializers.ModelSerializer):
-    # 프로젝트 전역 UUID PK 정책에 맞춰 UUIDField 사용
-    review_id = serializers.UUIDField(read_only=True)
+    # 모든 ID 필드가 UUID로 통일됨
     user_id = serializers.UUIDField(read_only=True)
     product_id = serializers.UUIDField(read_only=True)
 
