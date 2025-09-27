@@ -19,6 +19,7 @@ from domains.orders.models import Purchase, OrderItem
 from .serializers import (
     PurchaseReadSerializer,
     PurchaseWriteSerializer,
+    PurchaseReadyReadSerializer,
     OrderItemReadSerializer,
 )
 from shared.permissions import IsOwnerOrAdmin
@@ -126,6 +127,49 @@ class PurchaseMeListAPI(generics.ListAPIView):
         if getattr(self, "swagger_fake_view", False) or not self.request.user.is_authenticated:
             return Purchase.objects.none()
         return Purchase.objects.filter(user_id=self.request.user.id).order_by("-purchased_at")
+
+
+# -------------------------------
+# Ready Orders (결제 대기 주문만)
+# -------------------------------
+class PurchaseMeReadyListAPI(generics.ListAPIView):
+    """GET /api/v1/purchases/me/ready - 결제 대기 주문만 조회"""
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = PurchaseReadyReadSerializer  # 전용 시리얼라이저 사용
+    pagination_class = StandardResultsSetPagination
+    queryset = Purchase.objects.none()
+
+    @extend_schema(
+        operation_id="ListMyReadyPurchases",
+        summary="내 결제 대기 주문 조회",
+        description="현재 사용자의 결제 대기 중인 주문들만 조회합니다. order_id와 purchase_id가 동일한 값입니다.",
+        tags=["Orders"],
+        responses={
+            200: {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "purchase_id": {"type": "string", "format": "uuid", "description": "주문 ID (결제 API에서 orderId로 사용)"},
+                        "order_id": {"type": "string", "format": "uuid", "description": "주문 ID (purchase_id와 동일)"},
+                        "status": {"type": "string", "description": "주문 상태 (ready)"},
+                        "items_total": {"type": "string", "description": "상품 총액 (결제 금액)"},
+                        "purchased_at": {"type": "string", "format": "date-time", "description": "주문 생성 시간"},
+                    }
+                }
+            }
+        }
+    )
+    def get(self, *args, **kwargs):
+        return super().get(*args, **kwargs)
+
+    def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False) or not self.request.user.is_authenticated:
+            return Purchase.objects.none()
+        return Purchase.objects.filter(
+            user_id=self.request.user.id,
+            status=Purchase.STATUS_READY  # ready 상태만 필터링
+        ).order_by("-purchased_at")
 
 
 # -------------------------------

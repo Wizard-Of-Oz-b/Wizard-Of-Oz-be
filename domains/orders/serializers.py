@@ -18,6 +18,22 @@ class PurchaseReadSerializer(serializers.ModelSerializer):
         )
         read_only_fields = ("purchase_id", "status", "purchased_at", "product_name")
 
+
+class PurchaseReadyReadSerializer(serializers.ModelSerializer):
+    """결제 대기 주문 전용 시리얼라이저 - order_id 필드 추가"""
+    product_name = serializers.CharField(source="product.name", read_only=True)
+    order_id = serializers.UUIDField(source="purchase_id", read_only=True)  # order_id 추가
+
+    class Meta:
+        model = Purchase
+        fields = (
+            "purchase_id", "order_id", "user", "product", "product_name",
+            # amount, unit_price, options, option_key 제거 (헤더에서는 의미 없음)
+            "items_total",  # 상품 총액만 포함
+            "status", "purchased_at", "pg", "pg_tid",
+        )
+        read_only_fields = ("purchase_id", "order_id", "status", "purchased_at", "product_name")
+
 class PurchaseWriteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Purchase

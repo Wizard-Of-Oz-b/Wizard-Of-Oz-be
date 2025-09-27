@@ -296,5 +296,5 @@ DEFAULT_PRODUCT_PLACEHOLDER_URL = "/static/img/product_placeholder.png"
 SHIPMENTS_NOTIFY_WEBHOOK = os.getenv("SHIPMENTS_NOTIFY_WEBHOOK")
 
 APPEND_SLASH = False
-}
+
 
