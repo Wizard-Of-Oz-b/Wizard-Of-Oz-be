@@ -1,3 +1,4 @@
+import uuid
 from django.db import models
 from django.contrib.auth import get_user_model
 from domains.catalog.models import Product
@@ -5,7 +6,7 @@ from domains.catalog.models import Product
 User = get_user_model()
 
 class Review(models.Model):
-    review_id = models.BigAutoField(primary_key=True)
+    review_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE, db_column="user_id", related_name="reviews")
     product = models.ForeignKey(Product, on_delete=models.CASCADE, db_column="product_id", related_name="reviews")
     rating = models.PositiveSmallIntegerField()  # 1~5

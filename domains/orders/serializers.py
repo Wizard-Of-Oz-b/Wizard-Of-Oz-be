@@ -28,7 +28,7 @@ class PurchaseReadyReadSerializer(serializers.ModelSerializer):
         model = Purchase
         fields = (
             "purchase_id", "order_id", "user", "product", "product_name",
-            # amount, unit_price, options, option_key 제거 (헤더에서는 의미 없음)
+            "amount", "unit_price", "options", "option_key",
             "items_total",  # 상품 총액만 포함
             "status", "purchased_at", "pg", "pg_tid",
         )
