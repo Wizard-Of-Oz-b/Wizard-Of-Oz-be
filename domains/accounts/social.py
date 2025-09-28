@@ -14,6 +14,10 @@ class SocialAuthError(Exception):
 def _env(name: str, default: str = "") -> str:
     return os.getenv(name, getattr(settings, name, default))
 
+def get_provider_keys(provider: str) -> dict:
+    """제공자 키 정보 반환 (기존 _provider_config와 동일)"""
+    return _provider_config(provider)
+
 def _provider_config(provider: str) -> dict:
     p = provider.lower()
     # ✅ settings.SOCIAL_OAUTH 우선 사용
@@ -49,6 +53,71 @@ def _provider_config(provider: str) -> dict:
             "userinfo_url": "https://kapi.kakao.com/v2/user/me",
         }
     raise SocialAuthError(f"Unsupported provider: {provider}")
+
+
+# -------------------------
+# 0) OAuth 인가 URL 생성
+# -------------------------
+def generate_authorize_url(provider: str, request) -> str:
+    """OAuth 인가 URL 생성"""
+    cfg = _provider_config(provider)
+    client_id = cfg["client_id"]
+    
+    # 콜백 URL 생성 (현재 도메인 기준)
+    from django.urls import reverse
+    callback_url = request.build_absolute_uri(
+        reverse('accounts_auth:social-callback', kwargs={'provider': provider})
+    )
+    redirect_uri = callback_url
+    
+    # state 파라미터 생성 (CSRF 보호)
+    import secrets
+    state = secrets.token_urlsafe(32)
+    
+    if provider == "google":
+        scope = "openid email profile"
+        params = {
+            "client_id": client_id,
+            "redirect_uri": redirect_uri,
+            "scope": scope,
+            "response_type": "code",
+            "state": state,
+            "access_type": "offline",
+            "prompt": "consent"
+        }
+        base_url = "https://accounts.google.com/o/oauth2/v2/auth"
+        
+    elif provider == "naver":
+        scope = "name,email,profile_image"
+        params = {
+            "client_id": client_id,
+            "redirect_uri": redirect_uri,
+            "response_type": "code",
+            "state": state,
+            "scope": scope
+        }
+        base_url = "https://nid.naver.com/oauth2.0/authorize"
+        
+    elif provider == "kakao":
+        scope = "profile_nickname,account_email"
+        params = {
+            "client_id": client_id,
+            "redirect_uri": redirect_uri,
+            "response_type": "code",
+            "state": state,
+            "scope": scope
+        }
+        base_url = "https://kauth.kakao.com/oauth/authorize"
+        
+    else:
+        raise SocialAuthError(f"Unsupported provider: {provider}")
+    
+    # URL 파라미터 생성
+    import urllib.parse
+    query_string = urllib.parse.urlencode(params)
+    return f"{base_url}?{query_string}"
+
+
 # -------------------------
 # 1) 코드 → 토큰 교환
 # -------------------------
