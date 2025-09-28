@@ -1,17 +1,49 @@
-# domains/accounts/views_social.py
-from rest_framework import generics, permissions
-from rest_framework.response import Response
-from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse
-from drf_spectacular.types import OpenApiTypes
-from django.http import HttpResponseRedirect
+# domains/accounts/views_social.py  (DROP-IN 교체본)
 
+from django.conf import settings
+from django.http import HttpResponseRedirect
+from rest_framework import generics, permissions, status
+from rest_framework.response import Response
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema, OpenApiParameter
+from .utils import refresh_cookie_kwargs
 from .social import generate_authorize_url, _provider_config, SocialAuthError
+
+
+# -----------------------------
+# 공통: refresh 쿠키를 통일해서 굽는 헬퍼
+# -----------------------------
+def _refresh_cookie_max_age():
+    cfg = getattr(settings, "SIMPLE_JWT", {})
+    lifetime = cfg.get("REFRESH_TOKEN_LIFETIME")
+    try:
+        return int(lifetime.total_seconds())
+    except Exception:
+        return None
+
+def set_refresh_cookie(response: Response, refresh_token: str):
+    """
+    /auth/refresh와 로그아웃이 기대하는 것과 동일하게 굽는다.
+    - 이름: refresh
+    - Path: /api/v1/auth/
+    - HttpOnly: True
+    - 운영(HTTPS)에서는 SameSite=None; Secure
+    """
+    response.set_cookie(
+        key="refresh",
+        value=refresh_token,
+        httponly=True,
+        secure=not settings.DEBUG,
+        samesite="None" if not settings.DEBUG else "Lax",
+        max_age=_refresh_cookie_max_age(),
+        path="/api/v1/auth/",
+    )
 
 
 class SocialAuthorizeView(generics.GenericAPIView):
     """GET /api/v1/auth/social/{provider}/authorize/ - OAuth 인가 URL 생성 및 리다이렉트"""
     permission_classes = [permissions.AllowAny]
-    authentication_classes = []  # 인증 클래스 비활성화
+    authentication_classes = []
 
     @extend_schema(
         operation_id="RedirectToSocialAuthorize",
@@ -24,40 +56,28 @@ class SocialAuthorizeView(generics.GenericAPIView):
                 type=str,
                 location=OpenApiParameter.PATH,
                 description="OAuth 제공자 (google, naver, kakao)",
-                enum=["google", "naver", "kakao"]
+                enum=["google", "naver", "kakao"],
             )
         ],
         responses={
             302: {
                 "description": "OAuth 제공자의 인가 페이지로 리다이렉트",
                 "headers": {
-                    "Location": {
-                        "description": "OAuth 제공자의 인가 URL",
-                        "schema": {"type": "string", "format": "uri"}
-                    }
-                }
-            },
-            400: {
-                "type": "object",
-                "properties": {
-                    "detail": {"type": "string", "description": "에러 메시지"}
+                    "Location": {"description": "OAuth 인가 URL", "schema": {"type": "string", "format": "uri"}}
                 },
-                "example": {"detail": "google provider keys not configured"}
-            }
-        }
+            },
+            400: {"type": "object", "properties": {"detail": {"type": "string"}}},
+        },
     )
     def get(self, request, provider: str):
         provider = (provider or "").lower()
 
-        # 1) 제공자 키 확인
         keys = _provider_config(provider)
         if not keys or not keys.get("client_id"):
             return Response({"detail": f"{provider} provider keys not configured"}, status=400)
 
-        # 2) 인가 URL 생성
         try:
             authorize_url = generate_authorize_url(provider, request)
-            # 3) 302 리다이렉트 응답
             return HttpResponseRedirect(authorize_url)
         except SocialAuthError as e:
             return Response({"detail": f"{provider} authorize error: {e}"}, status=400)
@@ -66,7 +86,7 @@ class SocialAuthorizeView(generics.GenericAPIView):
 class SocialCallbackView(generics.GenericAPIView):
     """GET /api/v1/auth/social/{provider}/callback/ - OAuth 콜백 처리"""
     permission_classes = [permissions.AllowAny]
-    authentication_classes = []  # 인증 클래스 비활성화
+    authentication_classes = []
 
     @extend_schema(
         operation_id="HandleSocialCallback",
@@ -74,134 +94,78 @@ class SocialCallbackView(generics.GenericAPIView):
         description="OAuth 제공자에서 리다이렉트된 콜백을 처리합니다. 프론트엔드로 authorization code를 전달합니다.",
         tags=["Authentication"],
         parameters=[
-            OpenApiParameter(
-                name="provider",
-                type=str,
-                location=OpenApiParameter.PATH,
-                description="OAuth 제공자 (google, naver, kakao)",
-                enum=["google", "naver", "kakao"]
-            ),
-            OpenApiParameter(
-                name="code",
-                type=str,
-                location=OpenApiParameter.QUERY,
-                description="OAuth authorization code"
-            ),
-            OpenApiParameter(
-                name="state",
-                type=str,
-                location=OpenApiParameter.QUERY,
-                description="OAuth state parameter (CSRF 보호)"
-            ),
-            OpenApiParameter(
-                name="error",
-                type=str,
-                location=OpenApiParameter.QUERY,
-                description="OAuth error (사용자가 취소한 경우 등)"
-            )
+            OpenApiParameter("provider", type=str, location=OpenApiParameter.PATH,
+                             description="OAuth 제공자", enum=["google", "naver", "kakao"]),
+            OpenApiParameter("code", type=str, location=OpenApiParameter.QUERY, description="authorization code"),
+            OpenApiParameter("state", type=str, location=OpenApiParameter.QUERY, description="state (CSRF)"),
+            OpenApiParameter("error", type=str, location=OpenApiParameter.QUERY, description="OAuth error"),
         ],
-        responses={
-            200: {
-                "type": "object",
-                "properties": {
-                    "code": {"type": "string", "description": "Authorization code"},
-                    "state": {"type": "string", "description": "State parameter"},
-                    "message": {"type": "string", "description": "성공 메시지"}
-                }
-            },
-            400: {
-                "type": "object",
-                "properties": {
-                    "error": {"type": "string", "description": "에러 메시지"}
-                }
-            }
-        }
+        responses={200: {"type": "object"}},
     )
     def get(self, request, provider: str):
         provider = (provider or "").lower()
 
-        # OAuth 에러 확인
         error = request.GET.get("error")
         if error:
             return Response({"error": f"OAuth error: {error}"}, status=400)
 
-        # Authorization code 확인
         code = request.GET.get("code")
         if not code:
             return Response({"error": "No authorization code received"}, status=400)
 
         state = request.GET.get("state", "")
-
-        # 프론트엔드로 코드 전달
-        return Response({
-            "code": code,
-            "state": state,
-            "message": "Authorization code received. Please use this code to complete login."
-        }, status=200)
+        return Response({"code": code, "state": state, "message": "Authorization code received"}, status=200)
 
 
-# 기존 소셜로그인 뷰들 (기존 기능 유지)
 class SocialLoginView(generics.GenericAPIView):
-    """POST /api/v1/auth/social/{provider}/login/ - 소셜 로그인 (기존 기능)"""
+    """POST /api/v1/auth/social/{provider}/login/ - 소셜 로그인 (코드 교환 → JWT 발급)"""
     permission_classes = [permissions.AllowAny]
-    authentication_classes = []  # 인증 클래스 비활성화
+    authentication_classes = []
 
     @extend_schema(
         operation_id="SocialLogin",
         summary="소셜 로그인",
-        description="OAuth authorization code를 사용하여 JWT 토큰을 발급받습니다.",
+        description="프론트에서 받은 authorization code/state로 JWT를 발급하고 refresh 쿠키를 굽습니다.",
         tags=["Authentication"],
-        responses={
-            200: {
-                "type": "object",
-                "properties": {
-                    "access": {"type": "string", "description": "JWT Access Token"},
-                    "refresh": {"type": "string", "description": "JWT Refresh Token"}
-                }
-            },
-            400: {
-                "type": "object",
-                "properties": {
-                    "detail": {"type": "string", "description": "에러 메시지"}
-                }
-            }
-        }
+        responses={200: {"type": "object"}},
     )
     def post(self, request, provider: str):
-        # 기존 소셜로그인 로직 (간단한 구현)
-        return Response({
-            "access": "dummy_access_token",
-            "refresh": "dummy_refresh_token"
-        }, status=200)
+        provider = (provider or "").lower()
+
+        # 1) 프론트에서 넘어온 값
+        code = request.data.get("code")
+        state = request.data.get("state", "")
+        redirect_uri = request.data.get("redirect_uri", "")
+
+        if not code:
+            return Response({"detail": "code is required"}, status=400)
+
+        # 2) (여기서) code → 공급자 토큰 교환 → 프로필 조회 → 유저 매핑 → JWT 발급
+        #    아래 access/refresh는 실제 발급 로직 결과를 담아야 합니다.
+        #    지금은 예시로 변수 이름만 유지합니다.
+        access_token = "dummy_access_token"      # TODO: 실 토큰으로 교체
+        refresh_token = "dummy_refresh_token"    # TODO: 실 토큰으로 교체
+
+        # 3) 응답 + refresh 쿠키 굽기 (이 부분이 '통일'의 핵심)
+        resp = Response({"access": access_token}, status=200)
+        resp.set_cookie(
+            "refresh", str(refresh_token),
+            **refresh_cookie_kwargs(settings.DEBUG)
+        )
+        return resp
 
 
 class SocialUnlinkView(generics.GenericAPIView):
-    """DELETE /api/v1/auth/social/{provider}/unlink/ - 소셜 연동 해제 (기존 기능)"""
+    """DELETE /api/v1/auth/social/{provider}/unlink/ - 소셜 연동 해제"""
     permission_classes = [permissions.IsAuthenticated]
-    authentication_classes = []  # 인증 클래스 비활성화
+    authentication_classes = []
 
     @extend_schema(
         operation_id="SocialUnlink",
         summary="소셜 계정 연동 해제",
         description="현재 사용자의 소셜 계정 연동을 해제합니다.",
         tags=["Authentication"],
-        responses={
-            200: {
-                "type": "object",
-                "properties": {
-                    "message": {"type": "string", "description": "성공 메시지"}
-                }
-            },
-            404: {
-                "type": "object",
-                "properties": {
-                    "detail": {"type": "string", "description": "연동된 계정 없음"}
-                }
-            }
-        }
+        responses={200: {"type": "object"}},
     )
     def delete(self, request, provider: str):
-        # 기존 소셜연동 해제 로직 (간단한 구현)
-        return Response({
-            "message": f"{provider} 계정 연동이 해제되었습니다."
-        }, status=200)
+        return Response({"message": f"{provider} 계정 연동이 해제되었습니다."}, status=200)

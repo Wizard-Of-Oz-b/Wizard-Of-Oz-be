@@ -11,7 +11,4 @@ urlpatterns = [
     path("auth/logout",   LogoutView.as_view()),
     path("users/me",      MeView.as_view()),
 
-    # 소셜
-    path("auth/social/<str:provider>/login", SocialLoginView.as_view(), name="social-login"),
-    path("auth/social/<str:provider>/unlink", SocialUnlinkView.as_view(), name="social-unlink"),
 ]
