@@ -215,25 +215,33 @@ class UpdateAllReadyOrdersShippingAddressAPI(views.APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     @extend_schema(
+        summary="현재 사용자의 모든 ready 주문 배송지 일괄 변경",
+        tags=["Orders"],
         request={
-            "type": "object",
-            "properties": {
-                "address_id": {
-                    "type": "string",
-                    "format": "uuid",
-                    "description": "등록된 배송지 ID (address와 중복 사용 불가)"
-                },
-                "address": {
-                    "type": "object",
-                    "properties": {
-                        "recipient": {"type": "string"},
-                        "phone": {"type": "string"},
-                        "postcode": {"type": "string"},
-                        "address1": {"type": "string"},
-                        "address2": {"type": "string"},
-                        "memo": {"type": "string"}
+            "application/json": {
+                "type": "object",
+                "properties": {
+                    "address_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "등록된 배송지 ID (address와 중복 사용 불가)"
                     },
-                    "description": "새로운 배송지 정보 (address_id와 중복 사용 불가)"
+                    "address": {
+                        "type": "object",
+                        "properties": {
+                            "recipient": {"type": "string"},
+                            "phone": {"type": "string"},
+                            "postcode": {"type": "string"},
+                            "address1": {"type": "string"},
+                            "address2": {"type": "string"},
+                            "memo": {"type": "string"}
+                        },
+                        "description": "새로운 배송지 정보 (address_id와 중복 사용 불가)"
+                    },
+                    "memo": {
+                        "type": "string",
+                        "description": "배송 메모 (선택사항)"
+                    }
                 }
             }
         },
@@ -308,7 +316,7 @@ class UpdateAllReadyOrdersShippingAddressAPI(views.APIView):
             }, status=200)
 
         # 일괄 업데이트 실행
-        updated_count = orders_to_update.update(**address_data, updated_at=timezone.now())
+        updated_count = orders_to_update.update(**address_data)
         
         # 업데이트된 주문 ID 목록
         updated_purchase_ids = list(orders_to_update.values_list('purchase_id', flat=True))

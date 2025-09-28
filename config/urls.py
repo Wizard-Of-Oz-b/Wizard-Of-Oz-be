@@ -9,8 +9,6 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from drf_spectacular.renderers import OpenApiJsonRenderer
 from rest_framework.permissions import AllowAny
 
-# 소셜 로그인 뷰 (기존 유지)
-from domains.accounts.views_social import SocialLoginView, SocialUnlinkView
 from domains.shipments.views import ShipmentWebhookAPI
 
 
@@ -46,9 +44,6 @@ urlpatterns = [
     path("api/v1/shipments/", include("domains.shipments.urls")),
     path("api/v1/", include("api.v1.urls")),
 
-    # 🔒 소셜 로그인 (그대로)
-    path("api/v1/auth/social/<str:provider>/login", SocialLoginView.as_view(), name="social-login"),
-    path("api/v1/auth/social/<str:provider>/unlink", SocialUnlinkView.as_view(), name="social-unlink"),
 
     # ✅ 최종 명세 경로 (그대로)
     path(
