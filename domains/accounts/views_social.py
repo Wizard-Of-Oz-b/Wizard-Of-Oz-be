@@ -8,7 +8,7 @@ from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 from .utils import refresh_cookie_kwargs
 from .social import generate_authorize_url, _provider_config, SocialAuthError
-
+from urllib.parse import urlencode
 
 # -----------------------------
 # 공통: refresh 쿠키를 통일해서 굽는 헬퍼
@@ -33,7 +33,7 @@ def set_refresh_cookie(response: Response, refresh_token: str):
         key="refresh",
         value=refresh_token,
         httponly=True,
-        secure=not settings.DEBUG,
+        secure=False,
         samesite="None" if not settings.DEBUG else "Lax",
         max_age=_refresh_cookie_max_age(),
         path="/api/v1/auth/",
@@ -84,14 +84,17 @@ class SocialAuthorizeView(generics.GenericAPIView):
 
 
 class SocialCallbackView(generics.GenericAPIView):
-    """GET /api/v1/auth/social/{provider}/callback/ - OAuth 콜백 처리"""
+    """GET /api/v1/auth/social/{provider}/callback/ - OAuth 콜백 처리 (프론트로 code/state 전달)"""
     permission_classes = [permissions.AllowAny]
     authentication_classes = []
+
+    # ← 데코레이터 앞(또는 클래스 맨 위)에 클래스 변수로 선언
+    FRONT_CALLBACK = getattr(settings, "FRONTEND_OAUTH_CALLBACK", "http://localhost:5173/oauth/callback")
 
     @extend_schema(
         operation_id="HandleSocialCallback",
         summary="소셜 로그인 콜백 처리",
-        description="OAuth 제공자에서 리다이렉트된 콜백을 처리합니다. 프론트엔드로 authorization code를 전달합니다.",
+        description="OAuth 제공자에서 돌아온 code/state를 프론트 콜백 URL로 전달합니다.",
         tags=["Authentication"],
         parameters=[
             OpenApiParameter("provider", type=str, location=OpenApiParameter.PATH,
@@ -100,22 +103,21 @@ class SocialCallbackView(generics.GenericAPIView):
             OpenApiParameter("state", type=str, location=OpenApiParameter.QUERY, description="state (CSRF)"),
             OpenApiParameter("error", type=str, location=OpenApiParameter.QUERY, description="OAuth error"),
         ],
-        responses={200: {"type": "object"}},
+        responses={302: {"description": "프론트 콜백으로 리다이렉트"}},
     )
     def get(self, request, provider: str):
-        provider = (provider or "").lower()
-
         error = request.GET.get("error")
         if error:
             return Response({"error": f"OAuth error: {error}"}, status=400)
 
         code = request.GET.get("code")
         if not code:
-            return Response({"error": "No authorization code received"}, status=400)
+            return Response({"error": "No authorization code"}, status=400)
 
         state = request.GET.get("state", "")
-        return Response({"code": code, "state": state, "message": "Authorization code received"}, status=200)
-
+        qs = urlencode({"code": code, "state": state})
+        # 클래스 변수는 self.FRONT_CALLBACK 으로 접근
+        return HttpResponseRedirect(f"{self.FRONT_CALLBACK}?{qs}")
 
 class SocialLoginView(generics.GenericAPIView):
     """POST /api/v1/auth/social/{provider}/login/ - 소셜 로그인 (코드 교환 → JWT 발급)"""
