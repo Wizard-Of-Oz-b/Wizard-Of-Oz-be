@@ -1,6 +1,6 @@
 from django.urls import path
 from .views import RegisterView, LoginView, LogoutView, RefreshView
-from .views_social import SocialLoginView, SocialUnlinkView
+from .views_social import SocialLoginView, SocialUnlinkView, SocialAuthorizeView, SocialCallbackView
 
 app_name = "accounts_auth"
 
@@ -17,7 +17,9 @@ urlpatterns = [
     # 로그아웃
     path("logout/", LogoutView.as_view(), name="logout"),
 
-    # 소셜 로그인
-    path("social/<str:provider>/login/",  SocialLoginView.as_view(),  name="social-login"),
-    path("social/<str:provider>/unlink/", SocialUnlinkView.as_view(), name="social-unlink"),
+    # 소셜 로그인 (기존 + 프론트엔드 요구사항 OAuth 플로우)
+    path("social/<str:provider>/authorize/", SocialAuthorizeView.as_view(), name="social-authorize"),
+    path("social/<str:provider>/callback/",  SocialCallbackView.as_view(),  name="social-callback"),
+    path("social/<str:provider>/login/",     SocialLoginView.as_view(),     name="social-login"),
+    path("social/<str:provider>/unlink/",    SocialUnlinkView.as_view(),    name="social-unlink"),
 ]
