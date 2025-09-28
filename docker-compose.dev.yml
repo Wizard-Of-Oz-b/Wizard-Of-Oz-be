@@ -1,57 +1,83 @@
 services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: shopapi
+      POSTGRES_USER: shop
+      POSTGRES_PASSWORD: secret
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shop -d shopapi"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
   redis:
-    image: redis:7-alpine
-    command: ["redis-server","--save","","--appendonly","no","--maxmemory","128mb","--maxmemory-policy","allkeys-lru"]
-    ports: ["6379:6379"]
+    image: redis:7
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
 
   web:
     build:
       context: .
       dockerfile: Dockerfile.dev
     env_file: .env.dev
-    environment:
-      DJANGO_ENV: dev
-      UV_PROJECT_ENVIRONMENT: /opt/venv   # ← 추가 (안전장치)
-      # PGSSLMODE: require
-    volumes:
-      - .:/app
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
     ports:
       - "8000:8000"
-    depends_on: [redis]
-    command: >
-      bash -lc "
-        uv run python manage.py migrate --noinput &&
-        uv run uvicorn config.asgi:application --host 0.0.0.0 --port 8000 --reload
-      "
+    volumes:
+      - .:/app
+      - /app/.venv
+    healthcheck:
+      test: ["CMD-SHELL","curl -fsS http://localhost:8000/api/schema/ >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
 
   worker:
-    user: "1000:1000"
     build:
       context: .
       dockerfile: Dockerfile.dev
     env_file: .env.dev
-    environment:
-      DJANGO_ENV: dev
-      UV_PROJECT_ENVIRONMENT: /opt/venv   # ← 추가
-      # PGSSLMODE: require
-    depends_on: [redis]
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    command: >
+      bash -lc "uv run celery -A config worker -l info --concurrency=1"
     volumes:
       - .:/app
-    command: >
-      bash -lc "uv run celery -A config worker -l info -c 1 -O fair --max-tasks-per-child=100"
+      - /app/.venv
+    restart: unless-stopped
 
   beat:
-    user: "1000:1000"
     build:
       context: .
       dockerfile: Dockerfile.dev
     env_file: .env.dev
-    environment:
-      DJANGO_ENV: dev
-      UV_PROJECT_ENVIRONMENT: /opt/venv   # ← 추가
-      # PGSSLMODE: require
-    depends_on: [redis]
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    command: >
+      bash -lc "uv run celery -A config beat -l info -s /data/celerybeat-schedule"
     volumes:
       - .:/app
-    command: >
-      bash -lc "uv run celery -A config beat -l info --max-interval=30"
+      - /app/.venv
+      - beat-data:/data
+    restart: unless-stopped
+
+volumes:
+  dbdata:
+  beat-data:
