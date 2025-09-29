@@ -9,6 +9,7 @@ urlpatterns = [
     path("auth/", include(("domains.accounts.urls_auth", "accounts_auth"))),
     path("auth/token/", EmailTokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("auth/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+    path("auth/", include(("domains.accounts.urls_auth", "accounts_auth"), namespace="accounts_auth")),
 
     # --- Users ---
     path("users/", include(("domains.accounts.urls_users", "accounts_users"))),
