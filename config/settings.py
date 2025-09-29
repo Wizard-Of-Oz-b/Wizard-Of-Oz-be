@@ -227,26 +227,20 @@ SECURE_BROWSER_XSS_FILTER = True
 X_FRAME_OPTIONS = 'DENY'
 
 CORS_ALLOWED_ORIGINS = [
-    "https://localhost:5173",
-    "https://127.0.0.1:5173",
-    "http://localhost:5173",  # 개발용 (DEBUG=True일 때)
-    "http://127.0.0.1:5173",  # 개발용 (DEBUG=True일 때)
     "https://ozshop-kappa.vercel.app",
     "https://3-34-164-251.sslip.io",
+    "http://localhost:5173",
+    "https://localhost:5173",
+    "http://127.0.0.1:5173",
+    "https://127.0.0.1:5173",
 ]
-CORS_ALLOW_CREDENTIALS = True
 
 CSRF_TRUSTED_ORIGINS = [
-    "https://localhost:5173",
-    "https://127.0.0.1:5173",
-    "https://localhost:3000",
-    "https://127.0.0.1:3000",
-    "http://localhost:5173",  # 개발용 (DEBUG=True일 때)
-    "http://127.0.0.1:5173",  # 개발용 (DEBUG=True일 때)
-    "http://localhost:3000",  # 개발용 (DEBUG=True일 때)
-    "http://127.0.0.1:3000",  # 개발용 (DEBUG=True일 때)
     "https://ozshop-kappa.vercel.app",
     "https://3-34-164-251.sslip.io",
+    "https://3.34.164.251",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
 ]
 
 # OAuth / 3rd Party
@@ -320,3 +314,9 @@ SHIPMENTS_NOTIFY_WEBHOOK = os.getenv("SHIPMENTS_NOTIFY_WEBHOOK")
 
 APPEND_SLASH = False
 
+
+FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "http://localhost:5173")
+FRONTEND_OAUTH_CALLBACK = os.getenv(
+    "FRONTEND_OAUTH_CALLBACK",
+    f"{FRONTEND_BASE_URL.rstrip('/')}/oauth/callback"
+)
