@@ -3,7 +3,7 @@ FROM python:3.13-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1
+    UV_PROJECT_ENVIRONMENT=/opt/venv
 
 WORKDIR /app
 
@@ -12,14 +12,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential libpq-dev libjpeg62-turbo-dev zlib1g-dev curl ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 
-# Python deps via pyproject
-COPY pyproject.toml /app/pyproject.toml
-RUN python -m pip install --upgrade pip setuptools wheel \
- && pip install -e . \
- && pip install gunicorn whitenoise
+# uv 설치
+RUN python -m pip install --upgrade pip && pip install uv
 
-# project source
-COPY . /app
+# 의존성 캐시 레이어 만들기
+COPY pyproject.toml uv.lock ./
+RUN uv venv /opt/venv \
+ && uv sync --frozen
+
+# 앱 코드 (마지막에 복사해 캐시 적게 깨지게)
+COPY . .
 
 # runtime env (HTTP 기준 – HTTPS 전환 시 settings에서 변경)
 ENV DJANGO_SETTINGS_MODULE=config.settings \
@@ -29,8 +31,11 @@ ENV DJANGO_SETTINGS_MODULE=config.settings \
     CSRF_COOKIE_SECURE=0 \
     SECURE_SSL_REDIRECT=0
 
+ENV VIRTUAL_ENV=/opt/venv
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
 # collectstatic at build (실패 시 빌드 계속)
-RUN python manage.py collectstatic --noinput || true
+RUN uv run python manage.py collectstatic --noinput || true
 
 EXPOSE 8000
-CMD ["gunicorn","config.wsgi:application","--bind","0.0.0.0:8000","--workers","3","--threads","3","--timeout","60"]
+CMD ["uv", "run", "gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--threads", "3", "--timeout", "60"]
