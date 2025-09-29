@@ -23,7 +23,10 @@ SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-secret")
 _DEBUG_RAW = os.getenv("DEBUG", "1")
 DEBUG = str(_DEBUG_RAW).strip().lower() in ("1", "true", "yes", "on")
 
-ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",")
+ALLOWED_HOSTS = os.getenv(
+    "ALLOWED_HOSTS",
+    "127.0.0.1,localhost,3.34.164.251,3-34-164-251.sslip.io"
+).split(",")
 
 # Applications
 # ──────────────────────────────────────────────────────────────────────────────
@@ -214,11 +217,11 @@ SESSION_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_SAMESITE = "Lax"
 
 # HTTPS Security Settings
-SECURE_SSL_REDIRECT = not DEBUG  # DEBUG=False일 때만 HTTPS 리다이렉트
+SECURE_SSL_REDIRECT = str(os.getenv("SECURE_SSL_REDIRECT", "0")).lower() in ("1","true","yes","on")
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')  # Nginx에서 전달하는 HTTPS 헤더
-SECURE_HSTS_SECONDS = 31536000 if not DEBUG else 0  # 1년 (DEBUG=False일 때만)
-SECURE_HSTS_INCLUDE_SUBDOMAINS = not DEBUG
-SECURE_HSTS_PRELOAD = not DEBUG
+SECURE_HSTS_SECONDS = int(os.getenv("SECURE_HSTS_SECONDS", "0"))
+SECURE_HSTS_INCLUDE_SUBDOMAINS = SECURE_HSTS_SECONDS > 0
+SECURE_HSTS_PRELOAD = SECURE_HSTS_SECONDS > 0
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_BROWSER_XSS_FILTER = True
 X_FRAME_OPTIONS = 'DENY'
@@ -228,6 +231,8 @@ CORS_ALLOWED_ORIGINS = [
     "https://127.0.0.1:5173",
     "http://localhost:5173",  # 개발용 (DEBUG=True일 때)
     "http://127.0.0.1:5173",  # 개발용 (DEBUG=True일 때)
+    "https://ozshop-kappa.vercel.app",
+    "https://3-34-164-251.sslip.io",
 ]
 CORS_ALLOW_CREDENTIALS = True
 
@@ -240,6 +245,8 @@ CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1:5173",  # 개발용 (DEBUG=True일 때)
     "http://localhost:3000",  # 개발용 (DEBUG=True일 때)
     "http://127.0.0.1:3000",  # 개발용 (DEBUG=True일 때)
+    "https://ozshop-kappa.vercel.app",
+    "https://3-34-164-251.sslip.io",
 ]
 
 # OAuth / 3rd Party
@@ -247,25 +254,26 @@ SOCIAL_OAUTH = {
     "google": {
         "client_id": os.getenv("GOOGLE_CLIENT_ID", ""),
         "client_secret": os.getenv("GOOGLE_CLIENT_SECRET", ""),
-        "redirect_uri": os.getenv("OAUTH_REDIRECT_URI", ""),
+        "redirect_uri": os.getenv("GOOGLE_REDIRECT_URI", ""),  # ← 수정
         "token_url": "https://oauth2.googleapis.com/token",
         "userinfo_url": "https://openidconnect.googleapis.com/v1/userinfo",
     },
     "naver": {
         "client_id": os.getenv("NAVER_CLIENT_ID", ""),
         "client_secret": os.getenv("NAVER_CLIENT_SECRET", ""),
-        "redirect_uri": os.getenv("OAUTH_REDIRECT_URI", ""),
+        "redirect_uri": os.getenv("NAVER_REDIRECT_URI", ""),   # ← 수정
         "token_url": "https://nid.naver.com/oauth2.0/token",
         "userinfo_url": "https://openapi.naver.com/v1/nid/me",
     },
     "kakao": {
         "client_id": os.getenv("KAKAO_CLIENT_ID", ""),
         "client_secret": os.getenv("KAKAO_CLIENT_SECRET", ""),
-        "redirect_uri": os.getenv("KAKAO_REDIRECT_URI", ""),
+        "redirect_uri": os.getenv("KAKAO_REDIRECT_URI", ""),   # (유지)
         "token_url": "https://kauth.kakao.com/oauth/token",
         "userinfo_url": "https://kapi.kakao.com/v2/user/me",
     },
 }
+
 
 TOSS_CLIENT_KEY = os.getenv("TOSS_CLIENT_KEY", "")
 TOSS_SECRET_KEY = os.getenv("TOSS_SECRET_KEY", "")

@@ -35,8 +35,6 @@ services:
     depends_on:
       db: { condition: service_healthy }
       redis: { condition: service_healthy }
-    command: >
-      bash -lc "uv run python manage.py runserver 0.0.0.0:8000"
     ports:
       - "8000:8000"
       - "8443:8443"  # 개발용 HTTPS 포트
