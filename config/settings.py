@@ -213,18 +213,33 @@ CSRF_COOKIE_SECURE = COOKIE_SECURE
 SESSION_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_SAMESITE = "Lax"
 
+# HTTPS Security Settings
+SECURE_SSL_REDIRECT = not DEBUG  # DEBUG=False일 때만 HTTPS 리다이렉트
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')  # Nginx에서 전달하는 HTTPS 헤더
+SECURE_HSTS_SECONDS = 31536000 if not DEBUG else 0  # 1년 (DEBUG=False일 때만)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = not DEBUG
+SECURE_HSTS_PRELOAD = not DEBUG
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_BROWSER_XSS_FILTER = True
+X_FRAME_OPTIONS = 'DENY'
+
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
+    "https://localhost:5173",
+    "https://127.0.0.1:5173",
+    "http://localhost:5173",  # 개발용 (DEBUG=True일 때)
+    "http://127.0.0.1:5173",  # 개발용 (DEBUG=True일 때)
 ]
 CORS_ALLOW_CREDENTIALS = True
 
 CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "http://localhost:3000",
+    "https://localhost:5173",
+    "https://127.0.0.1:5173",
     "https://localhost:3000",
-    "http://127.0.0.1:3000",
+    "https://127.0.0.1:3000",
+    "http://localhost:5173",  # 개발용 (DEBUG=True일 때)
+    "http://127.0.0.1:5173",  # 개발용 (DEBUG=True일 때)
+    "http://localhost:3000",  # 개발용 (DEBUG=True일 때)
+    "http://127.0.0.1:3000",  # 개발용 (DEBUG=True일 때)
 ]
 
 # OAuth / 3rd Party

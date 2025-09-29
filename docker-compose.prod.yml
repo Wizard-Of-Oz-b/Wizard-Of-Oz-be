@@ -130,9 +130,11 @@ services:
       web:
         condition: service_healthy
     ports:
-      - "80:80"
+      - "80:80"   # HTTP (redirects to HTTPS)
+      - "443:443" # HTTPS
     volumes:
       - static_volume:/app/staticfiles:ro
+      - ./ssl:/etc/nginx/ssl:ro  # SSL 인증서 볼륨 마운트
     deploy:
       resources:
         limits: { memory: "48m" }
