@@ -46,6 +46,7 @@ class ShipmentsListAPI(APIView):
         parameters=[
             OpenApiParameter(name="page", required=False, type=int, description="page number (1-base)"),
             OpenApiParameter(name="size", required=False, type=int, description="page size"),
+            OpenApiParameter(name="order_id", required=False, type=str, description="filter shipments by order ID"),
         ],
         responses={200: ShipmentSerializer(many=True)},
     )
@@ -59,6 +60,19 @@ class ShipmentsListAPI(APIView):
         role = getattr(user, "role", "user")
 
         qs = Shipment.objects.select_related("order").order_by("-created_at")
+        
+        # Filter by order_id if provided
+        order_id = request.query_params.get('order_id')
+        if order_id:
+            # Validate UUID format before filtering
+            import uuid
+            try:
+                uuid.UUID(order_id)
+                qs = qs.filter(order__purchase_id=order_id)
+            except (ValueError, TypeError):
+                # Invalid UUID format - return empty queryset
+                qs = qs.none()
+        
         if role not in ("admin", "manager", "cs"):
             qs = qs.filter(Q(user=user) | Q(order__user=user))
 
