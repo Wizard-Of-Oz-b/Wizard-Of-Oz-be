@@ -82,29 +82,16 @@ class SocialAuthorizeView(generics.GenericAPIView):
         except SocialAuthError as e:
             return Response({"detail": f"{provider} authorize error: {e}"}, status=400)
 
-
 class SocialCallbackView(generics.GenericAPIView):
     """GET /api/v1/auth/social/{provider}/callback/ - OAuth 콜백 처리 (프론트로 code/state 전달)"""
     permission_classes = [permissions.AllowAny]
     authentication_classes = []
 
-    # ← 데코레이터 앞(또는 클래스 맨 위)에 클래스 변수로 선언
-    FRONT_CALLBACK = getattr(settings, "FRONTEND_OAUTH_CALLBACK", "http://localhost:5173/oauth/callback")
-
-    @extend_schema(
-        operation_id="HandleSocialCallback",
-        summary="소셜 로그인 콜백 처리",
-        description="OAuth 제공자에서 돌아온 code/state를 프론트 콜백 URL로 전달합니다.",
-        tags=["Authentication"],
-        parameters=[
-            OpenApiParameter("provider", type=str, location=OpenApiParameter.PATH,
-                             description="OAuth 제공자", enum=["google", "naver", "kakao"]),
-            OpenApiParameter("code", type=str, location=OpenApiParameter.QUERY, description="authorization code"),
-            OpenApiParameter("state", type=str, location=OpenApiParameter.QUERY, description="state (CSRF)"),
-            OpenApiParameter("error", type=str, location=OpenApiParameter.QUERY, description="OAuth error"),
-        ],
-        responses={302: {"description": "프론트 콜백으로 리다이렉트"}},
+    # 프론트 콜백 주소 (settings.FRONTEND_OAUTH_CALLBACK 없으면 로컬 기본값)
+    FRONT_CALLBACK = getattr(
+        settings, "FRONTEND_OAUTH_CALLBACK", "http://localhost:5173/oauth/callback"
     )
+
     def get(self, request, provider: str):
         error = request.GET.get("error")
         if error:
@@ -116,7 +103,6 @@ class SocialCallbackView(generics.GenericAPIView):
 
         state = request.GET.get("state", "")
         qs = urlencode({"code": code, "state": state})
-        # 클래스 변수는 self.FRONT_CALLBACK 으로 접근
         return HttpResponseRedirect(f"{self.FRONT_CALLBACK}?{qs}")
 
 class SocialLoginView(generics.GenericAPIView):
