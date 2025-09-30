@@ -2,35 +2,48 @@
 from __future__ import annotations
 
 from django.shortcuts import get_object_or_404
-from rest_framework import status, serializers, permissions, generics
-from rest_framework.permissions import IsAuthenticated
+from rest_framework import status, permissions, generics
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
 
 from .models import CartItem, Cart
-from .serializers import CartSerializer, AddCartItemSerializer, CartItemSerializer
+from .serializers import (
+    CartSerializer, 
+    AddCartItemSerializer, 
+    CartItemSerializer,
+    UpdateCartQtySerializer,
+    UpdateCartItemSerializer
+)
 from .services import get_or_create_user_cart
 from domains.catalog.models import Product
 
 
-# PATCH 요청 바디 검증용(수량만 받음)
-class UpdateCartQtySerializer(serializers.Serializer):
-    quantity = serializers.IntegerField(min_value=1)
+def get_cart_item_prefetch_queryset():
+    """장바구니 아이템 프리패치 쿼리셋 생성 (중복 코드 제거)"""
+    qs = CartItem.objects.select_related("product")
+    if hasattr(Product, "images"):
+        qs = qs.prefetch_related("product__images")
+    if hasattr(Product, "productimage_set"):
+        qs = qs.prefetch_related("product__productimage_set")
+    return qs
 
 
-# PATCH 요청 바디 검증용(수량 + 옵션 변경)
-class UpdateCartItemSerializer(serializers.Serializer):
-    quantity = serializers.IntegerField(min_value=1, required=False)
-    option_key = serializers.CharField(required=False, allow_blank=True, default="")
-    options = serializers.JSONField(required=False, default=dict)
+def get_cart_prefetch_queryset():
+    """장바구니 프리패치 쿼리셋 생성 (중복 코드 제거)"""
+    prefetches = ["items__product"]
+    if hasattr(Product, "images"):
+        prefetches.append("items__product__images")
+    if hasattr(Product, "productimage_set"):
+        prefetches.append("items__product__productimage_set")
+    return prefetches
 
 
 # ─────────────────────────────────────────────────────────────
 # GET 내 카트 조회
 # ─────────────────────────────────────────────────────────────
 class MyCartView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated]
     serializer_class = CartSerializer  # 응답 스키마 힌트
 
     @extend_schema(
@@ -47,11 +60,7 @@ class MyCartView(APIView):
         cart = get_or_create_user_cart(request.user)
 
         # Product에 images 또는 기본 productimage_set가 있으면 프리패치
-        prefetches = ["items__product"]
-        if hasattr(Product, "images"):
-            prefetches.append("items__product__images")
-        if hasattr(Product, "productimage_set"):
-            prefetches.append("items__product__productimage_set")
+        prefetches = get_cart_prefetch_queryset()
 
         cart = (
             Cart.objects
@@ -66,7 +75,7 @@ class MyCartView(APIView):
 # POST 장바구니에 상품 추가
 # ─────────────────────────────────────────────────────────────
 class CartItemAddView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated]
     serializer_class = CartItemSerializer  # 응답의 형태(읽기용)
 
     @extend_schema(
@@ -93,12 +102,7 @@ class CartItemAddView(APIView):
         item = ser.save()
 
         # 응답 시 N+1 방지를 위해 재조회(상품/이미지 프리패치)
-        qs = CartItem.objects.select_related("product")
-        if hasattr(Product, "images"):
-            qs = qs.prefetch_related("product__images")
-        if hasattr(Product, "productimage_set"):
-            qs = qs.prefetch_related("product__productimage_set")
-        item = qs.get(pk=item.pk)
+        item = get_cart_item_prefetch_queryset().get(pk=item.pk)
 
         return Response(
             CartItemSerializer(item, context={"request": request}).data,
@@ -135,12 +139,7 @@ class CartItemQuantityView(APIView):
         item.save(update_fields=["quantity"])
 
         # 최신 product/이미지 프리패치 후 반환
-        qs = CartItem.objects.select_related("product")
-        if hasattr(Product, "images"):
-            qs = qs.prefetch_related("product__images")
-        if hasattr(Product, "productimage_set"):
-            qs = qs.prefetch_related("product__productimage_set")
-        item = qs.get(pk=item.pk)
+        item = get_cart_item_prefetch_queryset().get(pk=item.pk)
 
         return Response(CartItemSerializer(item, context={"request": request}).data, status=200)
 
@@ -190,12 +189,7 @@ class CartItemUpdateView(APIView):
         item.save()
 
         # 최신 product/이미지 프리패치 후 반환
-        qs = CartItem.objects.select_related("product")
-        if hasattr(Product, "images"):
-            qs = qs.prefetch_related("product__images")
-        if hasattr(Product, "productimage_set"):
-            qs = qs.prefetch_related("product__productimage_set")
-        item = qs.get(pk=item.pk)
+        item = get_cart_item_prefetch_queryset().get(pk=item.pk)
 
         return Response(CartItemSerializer(item, context={"request": request}).data, status=200)
 

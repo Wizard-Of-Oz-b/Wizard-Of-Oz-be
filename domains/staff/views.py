@@ -19,7 +19,7 @@ from urllib.parse import urlparse
 from urllib.request import urlopen, Request
 from django.core.files.base import ContentFile
 
-from domains.accounts.serializers import EmptySerializer
+from shared.api_markers import EmptySerializer
 from domains.staff.permissions import IsAdminRole, IsAdminOrManager
 from domains.staff.serializers import (
     # Users

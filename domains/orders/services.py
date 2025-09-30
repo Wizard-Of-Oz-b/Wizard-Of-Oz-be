@@ -200,6 +200,28 @@ def refund_purchase(purchase: Purchase) -> Purchase:
 # ─────────────────────────────────────────────────────────────────────────────
 # 결제 승인 직후: 카트 -> OrderItem 생성(멱등)
 # ─────────────────────────────────────────────────────────────────────────────
+def validate_cart_stock(user) -> None:
+    """
+    장바구니의 모든 아이템 재고를 사전 검증 (토스 결제 전)
+    재고 부족 시 ValidationError 발생
+    """
+    from domains.carts.services import get_user_cart
+    
+    cart = get_user_cart(user, create=False)
+    if not cart or not cart.items.exists():
+        raise EmptyCartError({"cart": "장바구니가 비어 있습니다."})
+    
+    # 각 아이템의 재고 검증
+    for ci in cart.items.select_related("product"):
+        try:
+            from domains.catalog.services import check_stock_availability
+            check_stock_availability(ci.product_id, ci.option_key or "", ci.quantity)
+        except (OutOfStockError, StockRowMissing) as e:
+            raise ValidationError({
+                "stock": f"재고 부족: {ci.product.name} (필요: {ci.quantity}, 옵션: {ci.option_key or '없음'}) - {str(e)}"
+            })
+
+
 @transaction.atomic
 def create_order_items_from_cart(purchase: Purchase) -> int:
     """
@@ -249,8 +271,9 @@ def create_order_items_from_cart(purchase: Purchase) -> int:
     except (OutOfStockError, StockRowMissing) as e:
         raise ValidationError({"stock": str(e)})
 
+    # OrderItem 생성 (실패 시 트랜잭션 롤백으로 재고도 복구됨)
     OrderItem.objects.bulk_create(items_to_create)
 
-    # 카트 비우기
+    # ✅ OrderItem 생성 성공 후에만 카트 비우기
     clear_cart_items(cart)
     return len(items_to_create)

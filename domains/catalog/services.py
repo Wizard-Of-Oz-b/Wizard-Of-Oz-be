@@ -112,3 +112,25 @@ def get_stock_quantity(product_id, option_key: str | dict | None) -> int:
         return int(ProductStock.objects.get(product_id=product_id, option_key=key).stock_quantity)
     except ProductStock.DoesNotExist:
         return 0
+
+
+def check_stock_availability(product_id, option_key: str | dict | None, required_quantity: int) -> None:
+    """
+    재고 가용성 검증 (토스 결제 전 사전 검증용)
+    재고 부족 시 OutOfStockError 또는 StockRowMissing 발생
+    """
+    key = normalize_option_key(option_key)
+    
+    try:
+        stock_row = ProductStock.objects.get(product_id=product_id, option_key=key)
+        available_quantity = int(stock_row.stock_quantity)
+        
+        if available_quantity < required_quantity:
+            raise OutOfStockError(
+                f"재고 부족: 상품 {product_id}, 옵션 '{key}', "
+                f"요청 수량 {required_quantity}, 가용 수량 {available_quantity}"
+            )
+    except ProductStock.DoesNotExist:
+        raise StockRowMissing(
+            f"재고 정보 없음: 상품 {product_id}, 옵션 '{key}'"
+        )
