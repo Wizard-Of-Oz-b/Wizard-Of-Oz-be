@@ -19,11 +19,11 @@ from .serializers import (
     LoginSerializer,
     LoginRequestSerializer,
     TokenPairResponseSerializer,
-    EmptySerializer,
     MeSerializer,
     MeUpdateSerializer,
     SocialAccountSerializer,
 )
+from shared.api_markers import EmptySerializer
 
 User = get_user_model()
 
