@@ -8,7 +8,7 @@ from rest_framework import status, parsers, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from drf_spectacular.utils import extend_schema, OpenApiParameter
-
+from rest_framework.permissions import IsAuthenticated
 from domains.orders.models import Purchase  # Shipment.order FK 대상
 from .models import Shipment
 from .serializers import (
@@ -257,3 +257,14 @@ class ShipmentTrackAPI(APIView):
         except Exception as e:
             logger.exception("예상치 못한 서버 오류: %s", e)
             return Response({"detail": "internal error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class CarrierListAPI(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        carriers = [
+            {"code": "04", "name": "CJ대한통운"},
+            {"code": "05", "name": "한진택배"},
+            {"code": "08", "name": "롯데택배"},
+        ]
+        return Response(carriers, status=200)
