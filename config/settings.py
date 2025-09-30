@@ -211,10 +211,11 @@ SIMPLE_JWT = {
 
 # Security / CORS / CSRF
 COOKIE_SECURE = not DEBUG
-SESSION_COOKIE_SECURE = COOKIE_SECURE
-CSRF_COOKIE_SECURE = COOKIE_SECURE
-SESSION_COOKIE_SAMESITE = "Lax"
-CSRF_COOKIE_SAMESITE = "Lax"
+SESSION_COOKIE_SAMESITE = "None"
+CSRF_COOKIE_SAMESITE    = "None"
+SESSION_COOKIE_SECURE   = True
+CSRF_COOKIE_SECURE      = True
+CORS_ALLOW_CREDENTIALS = True
 
 # HTTPS Security Settings
 SECURE_SSL_REDIRECT = str(os.getenv("SECURE_SSL_REDIRECT", "0")).lower() in ("1","true","yes","on")
@@ -228,11 +229,13 @@ X_FRAME_OPTIONS = 'DENY'
 
 CORS_ALLOWED_ORIGINS = [
     "https://ozshop-kappa.vercel.app",
+    "https://ozshop-kappa.vercel.app/",
     "https://3-34-164-251.sslip.io",
     "http://localhost:5173",
     "https://localhost:5173",
     "http://127.0.0.1:5173",
     "https://127.0.0.1:5173",
+    "https://ozshop.duckdns.org",
 ]
 
 CSRF_TRUSTED_ORIGINS = [
@@ -241,6 +244,8 @@ CSRF_TRUSTED_ORIGINS = [
     "https://3.34.164.251",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    "https://ozshop-kappa.vercel.app/",
+    "https://ozshop.duckdns.org",
 ]
 
 # OAuth / 3rd Party

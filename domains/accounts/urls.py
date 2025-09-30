@@ -1,7 +1,12 @@
 # domains/accounts/urls.py
 from django.urls import path
-from .views_social import SocialLoginView, SocialUnlinkView
 from .views import RegisterView, LoginView, RefreshView, LogoutView, MeView
+from .views_social import (  # ⬅️ 추가
+    SocialAuthorizeView,
+    SocialCallbackView,
+    SocialLoginView,
+    SocialUnlinkView,
+)
 
 urlpatterns = [
     # 기존 인증
@@ -11,4 +16,10 @@ urlpatterns = [
     path("auth/logout",   LogoutView.as_view()),
     path("users/me",      MeView.as_view()),
 
+    # ✅ 소셜 인증 라우트 추가
+    path("auth/social/<str:provider>/authorize/", SocialAuthorizeView.as_view()),
+    path("auth/social/<str:provider>/callback/",  SocialCallbackView.as_view()),
+    path("auth/social/<str:provider>/login/",     SocialLoginView.as_view()),
+    path("auth/social/<str:provider>/unlink/",    SocialUnlinkView.as_view()),
 ]
+
