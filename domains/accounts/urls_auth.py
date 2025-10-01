@@ -13,6 +13,7 @@ urlpatterns = [
 
     # 토큰 갱신
     path("refresh/", RefreshView.as_view(), name="refresh"),
+    path("token/refresh/", RefreshView.as_view(), name="token-refresh-compat"),
 
     # 로그아웃
     path("logout/", LogoutView.as_view(), name="logout"),
