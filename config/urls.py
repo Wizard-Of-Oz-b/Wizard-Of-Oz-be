@@ -1,5 +1,3 @@
-# config/urls.py — 최종본
-
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin

@@ -1,4 +1,3 @@
-# domains/catalog/models.py
 from __future__ import annotations
 
 import uuid
@@ -24,7 +23,7 @@ class Category(models.Model):
     )
     name = models.CharField(max_length=255)
 
-    # ✅ 계층 (부모가 없으면 L1)
+    # 계층 (부모가 없으면 L1)
     parent = models.ForeignKey(
         "self",
         on_delete=models.PROTECT,   # 상위가 있으면 삭제 금지(데이터 보전)
@@ -132,7 +131,7 @@ class Product(models.Model):
     description = models.TextField(blank=True)
     price = models.DecimalField(max_digits=12, decimal_places=2)
 
-    # ✅ 카테고리: 필요 시 L3만 연결하도록 정책을 정해도 되고, 현재는 자유롭게 허용
+    # 카테고리: 필요 시 L3만 연결하도록 정책을 정해도 되고, 현재는 자유롭게 허용
     category = models.ForeignKey(
         Category,
         null=True,
@@ -193,11 +192,6 @@ class ProductStock(models.Model):
                 fields=["product", "option_key"],
                 name="uq_product_option",
             ),
-            # 백오더 미사용 시 활성화 고려
-            # models.CheckConstraint(
-            #     check=models.Q(stock_quantity__gte=0),
-            #     name="ck_stock_non_negative",
-            # ),
         ]
         indexes = [
             models.Index(fields=["product", "stock_quantity"]),
@@ -248,7 +242,7 @@ class ProductImage(models.Model):
     # 파일 저장(기존) — URL 참조 케이스를 위해 blank/null 허용
     image = models.ImageField(upload_to=product_image_upload_to, blank=True, null=True)
 
-    # ✅ URL만 참조(다운로드 X)
+    # URL만 참조(다운로드 X)
     remote_url = models.URLField(blank=True, null=True)
     is_remote  = models.BooleanField(default=False)
 
@@ -278,7 +272,7 @@ class ProductImage(models.Model):
         mode = "REMOTE" if self.is_remote else "FILE"
         return f"ProductImage({self.id}) {self.product_id} [{mode}] main={self.is_main}"
 
-    # ✅ 통합 접근 URL (파일이면 MEDIA_URL 기반, 원격이면 원격 URL)
+    # 통합 접근 URL (파일이면 MEDIA_URL 기반, 원격이면 원격 URL)
     @property
     def url(self) -> str | None:
         if self.image:
@@ -288,7 +282,7 @@ class ProductImage(models.Model):
                 return None
         return self.remote_url
 
-    # ✅ 한쪽만 필수(파일 or 원격)
+    # 한쪽만 필수(파일 or 원격)
     def clean(self):
         from django.core.exceptions import ValidationError
         if self.is_remote:

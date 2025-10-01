@@ -1,4 +1,3 @@
-# domains/catalog/views_stock.py
 import django_filters as df
 from rest_framework import viewsets, permissions
 from rest_framework.filters import OrderingFilter

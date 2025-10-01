@@ -1,4 +1,3 @@
-# domains/orders/admin.py
 from django.contrib import admin
 from .models import Purchase, OrderItem
 
@@ -26,8 +25,7 @@ class PurchaseAdmin(admin.ModelAdmin):
         "pg_tid",
     )
     ordering = ("-purchased_at",)
-    # 필요 시 읽기전용 필드를 추가하세요.
-    # readonly_fields = ("purchased_at",)
+
 
 
 @admin.register(OrderItem)

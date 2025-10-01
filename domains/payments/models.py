@@ -1,4 +1,3 @@
-# domains/payments/models.py
 from __future__ import annotations
 
 import uuid
@@ -136,8 +135,6 @@ class PaymentEvent(models.Model):
 class PaymentCancel(models.Model):
     cancel_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     payment = models.ForeignKey(Payment, on_delete=models.CASCADE, related_name="cancels")
-    # 필요 시 order_item FK 연결 가능
-    # order_item = models.ForeignKey("orders.OrderItem", ...)
 
     status = models.CharField(
         max_length=16, choices=CancelStatus.choices, default=CancelStatus.REQUESTED

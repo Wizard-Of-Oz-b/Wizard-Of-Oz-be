@@ -1,4 +1,3 @@
-# domains/reviews/serializers.py
 from __future__ import annotations
 
 from rest_framework import serializers

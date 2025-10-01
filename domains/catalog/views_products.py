@@ -1,4 +1,3 @@
-# domains/catalog/views_products.py
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 import django_filters as df

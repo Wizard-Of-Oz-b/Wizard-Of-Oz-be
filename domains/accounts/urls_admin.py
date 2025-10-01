@@ -1,4 +1,3 @@
-# domains/accounts/urls_admin.py
 from django.urls import path
 from .views import UserListAdminAPI, UserDetailAdminAPI
 

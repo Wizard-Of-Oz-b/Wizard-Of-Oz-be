@@ -1,4 +1,3 @@
-# domains/orders/services.py
 from __future__ import annotations
 
 from typing import List, Tuple, Optional
@@ -83,7 +82,7 @@ def checkout_user_cart(user, *, clear_cart: bool = True) -> List[Purchase]:
     if clear_cart:
         CartItem.objects.filter(cart_id=cart.id).delete()
 
-    # 5) 생성된 구매 목록 재조회해서 반환 (PK 포함 보장)
+    # 5) 생성된 구매 목록 재조회해서 반환
     purchases = list(Purchase.objects.filter(user=user, purchased_at__gte=now).order_by("purchased_at", "purchase_id"))
     return purchases
 
@@ -106,7 +105,6 @@ def checkout(user) -> Tuple[Purchase, "Payment"]:
         .prefetch_related(
             "items",
             "items__product",
-            # "items__stock",             # stock 모델 연동 시 사용
             "items__product__category",
         )
         .filter(user=user)
@@ -169,7 +167,7 @@ def checkout(user) -> Tuple[Purchase, "Payment"]:
     order.save(update_fields=["items_total", "grand_total"])
 
     # 4) 결제 스텁 생성
-    from domains.payments.services import create_payment_stub  # ← 여기로 이동(지연 import)
+    from domains.payments.services import create_payment_stub
     payment = create_payment_stub(order, amount=order.grand_total)
     return order, payment
 

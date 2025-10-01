@@ -1,4 +1,3 @@
-# domains/payments/views_toss.py
 from __future__ import annotations
 
 from decimal import Decimal
@@ -76,7 +75,7 @@ class TossConfirmAPI(views.APIView):
         payment.easy_pay = data.get("easyPay") or payment.easy_pay
         payment.touch()
         payment.save()
-        # ✅ 승인 성공 시점에 OrderItem 생성(+재고 차감, 카트 비우기)
+        # 승인 성공 시점에 OrderItem 생성(+재고 차감, 카트 비우기)
         if provider_done:
             try:
                 created = create_order_items_from_cart(payment.order)
@@ -102,7 +101,7 @@ class TossConfirmAPI(views.APIView):
             order.status = PurchaseStatus.PAID
             order.save(update_fields=["status"])
 
-            # (선택) 결제 성공 시 장바구니 비우기: 유저 기준으로 비움
+            # 결제 성공 시 장바구니 비우기: 유저 기준으로 비움
             CartItem.objects.filter(cart__user=order.user).delete()
 
         return Response(PaymentReadSerializer(payment).data, status=status.HTTP_200_OK)
@@ -140,7 +139,6 @@ class TossSyncAPI(views.APIView):
             payment.status = PaymentStatus.PAID
         elif toss_status == "CANCELED":
             payment.status = PaymentStatus.CANCELED
-        # 필요 시 추가 매핑
 
         payment.last_synced_at = timezone.now()
         payment.touch()

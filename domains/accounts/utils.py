@@ -14,6 +14,6 @@ def refresh_cookie_kwargs(debug: bool = False) -> dict:
         secure=getattr(settings, "AUTH_COOKIE_SECURE", not debug),
         samesite=getattr(settings, "AUTH_COOKIE_SAMESITE", "None"),
         path=getattr(settings, "AUTH_COOKIE_PATH", "/"),
-        domain=getattr(settings, "AUTH_COOKIE_DOMAIN", None),  # 예: "ozshop.duckdns.org" 또는 ".ozshop.duckdns.org"
+        domain=getattr(settings, "AUTH_COOKIE_DOMAIN", None),
         max_age=getattr(settings, "AUTH_COOKIE_MAX_AGE", 14 * 24 * 3600),
     )

@@ -1,6 +1,3 @@
-"""
-domains/shipments/services.py 테스트
-"""
 import pytest
 from decimal import Decimal
 from unittest.mock import patch, MagicMock

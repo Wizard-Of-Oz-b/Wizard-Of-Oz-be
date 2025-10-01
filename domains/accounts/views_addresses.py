@@ -22,7 +22,7 @@ class MyAddressListCreateAPI(generics.ListCreateAPIView):
         ctx["request"] = self.request
         return ctx
 
-    # ✅ 여기 추가: 생성 응답은 ReadSerializer로 내려주기 (address_id 포함)
+    # 여기 추가: 생성 응답은 ReadSerializer로 내려주기 (address_id 포함)
     def create(self, request, *args, **kwargs):
         write_ser = self.get_serializer(data=request.data)
         write_ser.is_valid(raise_exception=True)

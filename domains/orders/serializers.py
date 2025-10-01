@@ -1,4 +1,3 @@
-# domains/orders/serializers.py
 from __future__ import annotations
 from domains.orders.utils import parse_option_key_safe
 from rest_framework import serializers
@@ -47,7 +46,7 @@ class PurchaseWriteSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("amount must be >= 1")
         return v
 
-# 호환용 별칭 (기존 코드에서 PurchaseSerializer를 임포트해도 동작)
+# 호환용 별칭
 PurchaseSerializer = PurchaseReadSerializer
 
 class OrderItemReadSerializer(serializers.ModelSerializer):
@@ -81,7 +80,6 @@ class OrderItemReadSerializer(serializers.ModelSerializer):
     def get_line_total(self, obj):
         # 모델 프로퍼티 있어도 직렬화에서 보장
         return (obj.unit_price or 0) * (obj.quantity or 0) - (obj.line_discount or 0) + (obj.line_tax or 0)
-# domains/orders/serializers.py
 
 
 class OrderItemMiniSerializer(serializers.ModelSerializer):

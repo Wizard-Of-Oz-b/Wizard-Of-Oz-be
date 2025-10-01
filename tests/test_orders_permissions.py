@@ -1,4 +1,3 @@
-# tests/test_orders_permissions.py
 import re
 import pytest
 from django.urls import get_resolver, URLPattern, URLResolver

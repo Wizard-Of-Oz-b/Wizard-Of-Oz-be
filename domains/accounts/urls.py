@@ -1,4 +1,3 @@
-# domains/accounts/urls.py
 from django.urls import path
 from .views import RegisterView, LoginView, RefreshView, LogoutView, MeView
 from .views_social import (  # ⬅️ 추가
