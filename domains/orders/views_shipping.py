@@ -1,4 +1,3 @@
-# domains/orders/views_shipping.py
 from drf_spectacular.utils import extend_schema
 from rest_framework import views, permissions, status
 from rest_framework.response import Response

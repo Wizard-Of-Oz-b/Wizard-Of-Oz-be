@@ -1,4 +1,3 @@
-# tests/test_shipments_services_edgecases.py
 import pytest
 import domains.shipments.services as svc
 from domains.orders.models import Purchase

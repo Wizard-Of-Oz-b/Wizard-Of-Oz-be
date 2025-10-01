@@ -1,4 +1,3 @@
-# domains/orders/models.py
 from __future__ import annotations
 
 import uuid
@@ -42,7 +41,7 @@ class Purchase(models.Model):
         db_column="user_id",
         related_name="purchases",
     )
-    # ✅ 헤더 레코드(합계만 갖는 주문)도 허용하기 위해 null/blank 허용
+    # 헤더 레코드(합계만 갖는 주문)도 허용하기 위해 null/blank 허용
     product = models.ForeignKey(
         Product,
         on_delete=models.PROTECT,
@@ -78,7 +77,7 @@ class Purchase(models.Model):
     )
     purchased_at = models.DateTimeField(auto_now_add=True)
 
-    # --- 결제사/거래 키(운영 권장) ---
+    # --- 결제사/거래 키 ---
     pg = models.CharField(max_length=20, blank=True, null=True, default=None)
     pg_tid = models.CharField(
         max_length=100, blank=True, null=True, unique=True, default=None
@@ -93,7 +92,7 @@ class Purchase(models.Model):
             models.Index(fields=["option_key"]),
         ]
         constraints = [
-            # ✅ 헤더 허용을 위해 amount >= 0 로 완화
+            # 헤더 허용을 위해 amount >= 0 로 완화
             models.CheckConstraint(
                 check=models.Q(amount__gte=0), name="ck_purchase_amount_ge_0"
             ),
@@ -107,7 +106,7 @@ class Purchase(models.Model):
         """amount × unit_price (라인 전용; 헤더는 0)"""
         return (self.unit_price or Decimal("0.00")) * Decimal(self.amount or 0)
 
-# 추가
+
 class OrderItem(models.Model):
     item_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, db_column="item_id")
     order = models.ForeignKey(Purchase, on_delete=models.CASCADE, related_name="items", db_column="order_id")

@@ -1,6 +1,3 @@
-"""
-domains/accounts/utils.py 테스트
-"""
 import pytest
 from domains.accounts.utils import refresh_cookie_kwargs
 

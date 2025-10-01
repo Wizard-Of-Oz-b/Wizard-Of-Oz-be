@@ -1,4 +1,3 @@
-# api/staff/views.py
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from django.shortcuts import get_object_or_404

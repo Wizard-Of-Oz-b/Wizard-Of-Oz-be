@@ -1,4 +1,3 @@
-# domains/shipments/views.py
 from typing import Any, Dict, List
 import os, logging, requests
 from rest_framework import views
