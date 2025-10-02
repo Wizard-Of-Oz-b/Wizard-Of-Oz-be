@@ -2,23 +2,30 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from django.shortcuts import get_object_or_404
-from django.db import transaction
-from django.utils import timezone
-from rest_framework import permissions, status, views
-from rest_framework.response import Response
-from rest_framework.exceptions import ValidationError
-from drf_spectacular.utils import extend_schema
 
-from .models import Payment, PaymentEvent, PaymentStatus, CancelStatus
-from .serializers import PaymentReadSerializer, PaymentCancelRequestSerializer
-from .serializers_toss import TossConfirmRequestSerializer
-from .toss_client import confirm as toss_confirm, retrieve_by_key, cancel as toss_cancel
-from domains.orders.models import PurchaseStatus  # 주문 헤더 상태 동기화용
+from django.db import transaction
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
+
+from drf_spectacular.utils import extend_schema
+from rest_framework import permissions, status, views
+from rest_framework.exceptions import ValidationError
+from rest_framework.response import Response
 
 from domains.carts.models import CartItem
-from domains.orders.services import create_order_items_from_cart, validate_cart_stock   # ← 추가
 from domains.catalog.services import OutOfStockError, StockRowMissing  # ← 추가
+from domains.orders.models import PurchaseStatus  # 주문 헤더 상태 동기화용
+from domains.orders.services import (  # ← 추가
+    create_order_items_from_cart,
+    validate_cart_stock,
+)
+
+from .models import CancelStatus, Payment, PaymentEvent, PaymentStatus
+from .serializers import PaymentCancelRequestSerializer, PaymentReadSerializer
+from .serializers_toss import TossConfirmRequestSerializer
+from .toss_client import cancel as toss_cancel
+from .toss_client import confirm as toss_confirm
+from .toss_client import retrieve_by_key
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -36,7 +43,7 @@ class TossConfirmAPI(views.APIView):
         ser = TossConfirmRequestSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
         payment_key: str = ser.validated_data["paymentKey"]
-        order_id: str = ser.validated_data["orderId"]          # = Payment.order_number
+        order_id: str = ser.validated_data["orderId"]  # = Payment.order_number
         amount: Decimal = ser.validated_data["amount"]
 
         # 1) 스텁 조회 & 락 (트랜잭션 밖에서 처리)
@@ -47,16 +54,24 @@ class TossConfirmAPI(views.APIView):
                 .first()
             )
             if not payment:
-                return Response({"detail": "payment stub not found (order_number)"}, status=404)
+                return Response(
+                    {"detail": "payment stub not found (order_number)"}, status=404
+                )
 
             # 2) 중복 컨펌 방지
             if payment.status == PaymentStatus.PAID:
                 return Response({"detail": "already confirmed"}, status=400)
 
             # 3) 금액 일치 검증(있다면)
-            if payment.amount_total and Decimal(str(payment.amount_total)) != Decimal(str(amount)):
+            if payment.amount_total and Decimal(str(payment.amount_total)) != Decimal(
+                str(amount)
+            ):
                 return Response(
-                    {"detail": "amount mismatch", "expected": str(payment.amount_total), "got": str(amount)},
+                    {
+                        "detail": "amount mismatch",
+                        "expected": str(payment.amount_total),
+                        "got": str(amount),
+                    },
                     status=400,
                 )
 
@@ -70,21 +85,25 @@ class TossConfirmAPI(views.APIView):
         data = toss_confirm(payment_key, order_id, amount)
 
         # 6) Payment 상태/스냅샷 반영 (트랜잭션 밖에서 처리)
-        provider_done = (data.get("status") == "DONE")
+        provider_done = data.get("status") == "DONE"
         with transaction.atomic():
-            payment.provider_payment_key = data.get("paymentKey") or payment.provider_payment_key
+            payment.provider_payment_key = (
+                data.get("paymentKey") or payment.provider_payment_key
+            )
             payment.method = (data.get("method") or "").lower() or payment.method
             if provider_done:
                 payment.status = PaymentStatus.PAID
             payment.amount_total = data.get("totalAmount") or payment.amount_total
             payment.vat = data.get("vat") or payment.vat or 0
             payment.approved_at = timezone.now()
-            payment.receipt_url = (data.get("receipt") or {}).get("url") or payment.receipt_url
+            payment.receipt_url = (data.get("receipt") or {}).get(
+                "url"
+            ) or payment.receipt_url
             payment.card_info = data.get("card") or payment.card_info
             payment.easy_pay = data.get("easyPay") or payment.easy_pay
             payment.touch()
             payment.save()
-        
+
         # ✅ 7) 승인 성공 시점에 OrderItem 생성 (별도 트랜잭션)
         if provider_done:
             try:
@@ -93,18 +112,23 @@ class TossConfirmAPI(views.APIView):
             except ValidationError as e:
                 # 🚨 스냅샷 불일치 시 토스 결제 취소 시도
                 try:
-                    toss_cancel(data.get("paymentKey"), "재고 부족으로 인한 주문 생성 실패")
+                    toss_cancel(
+                        data.get("paymentKey"), "재고 부족으로 인한 주문 생성 실패"
+                    )
                 except Exception as cancel_error:
                     # 토스 취소 실패 시 로그 기록 (운영팀 수동 처리 필요)
                     import logging
+
                     logger = logging.getLogger(__name__)
-                    logger.error(f"토스 결제 취소 실패: {cancel_error}, Payment ID: {payment.id}")
-                
+                    logger.error(
+                        f"토스 결제 취소 실패: {cancel_error}, Payment ID: {payment.id}"
+                    )
+
                 # ✅ Payment 상태를 READY로 롤백 (별도 트랜잭션으로 안전하게 처리)
                 with transaction.atomic():
                     payment.status = PaymentStatus.READY
                     payment.save(update_fields=["status"])
-                
+
                 return Response({"detail": f"주문 생성 실패: {str(e)}"}, status=500)
 
         # 8) 이벤트 로그 (별도 트랜잭션)
@@ -140,7 +164,10 @@ class TossConfirmAPI(views.APIView):
 class PaymentRetrieveAPI(views.APIView):
     permission_classes = [permissions.AllowAny]
 
-    @extend_schema(operation_id="PaymentRetrieve", responses={200: PaymentReadSerializer, 404: dict})
+    @extend_schema(
+        operation_id="PaymentRetrieve",
+        responses={200: PaymentReadSerializer, 404: dict},
+    )
     def get(self, request, payment_id):
         payment = get_object_or_404(Payment, pk=payment_id)
         return Response(PaymentReadSerializer(payment).data)
@@ -152,7 +179,10 @@ class PaymentRetrieveAPI(views.APIView):
 class TossSyncAPI(views.APIView):
     permission_classes = [permissions.IsAdminUser]
 
-    @extend_schema(operation_id="TossSync", responses={200: PaymentReadSerializer, 400: dict, 404: dict})
+    @extend_schema(
+        operation_id="TossSync",
+        responses={200: PaymentReadSerializer, 400: dict, 404: dict},
+    )
     @transaction.atomic
     def post(self, request, payment_id):
         payment = get_object_or_404(Payment, pk=payment_id)
@@ -213,7 +243,9 @@ class TossCancelAPI(views.APIView):
 
         # Payment 반영
         is_partial = data.get("status") == "PARTIAL_CANCELED"
-        payment.status = PaymentStatus.PARTIAL_CANCELED if is_partial else PaymentStatus.CANCELED
+        payment.status = (
+            PaymentStatus.PARTIAL_CANCELED if is_partial else PaymentStatus.CANCELED
+        )
         payment.canceled_at = timezone.now()
         payment.touch()
         payment.save()

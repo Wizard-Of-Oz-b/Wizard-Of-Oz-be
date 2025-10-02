@@ -3,18 +3,24 @@ import itertools
 from uuid import uuid4
 
 from django.contrib.auth import get_user_model
+
 from domains.catalog.models import Category, Product
 
 _email_seq = itertools.count(1)
 User = get_user_model()
 
+
 def unique_email(prefix="user", domain="example.com"):
     return f"{prefix}{next(_email_seq)}@{domain}"
+
 
 def _model_has_field(model, field_name: str) -> bool:
     return field_name in {f.name for f in model._meta.get_fields()}
 
-def create_user(email=None, password="Test1234!A", role="user", status="active", **extra):
+
+def create_user(
+    email=None, password="Test1234!A", role="user", status="active", **extra
+):
     """
     - username 필드가 있는 모델(AbstractUser 계열)이면 username을 자동 세팅
     - role/status 같은 커스텀 필드는 모델에 있을 때만 넣음
@@ -37,6 +43,7 @@ def create_user(email=None, password="Test1234!A", role="user", status="active",
     fields.update(extra)
     return User.objects.create_user(password=password, **fields)
 
+
 def create_product(
     name="베이직 티셔츠",
     price="19900",
@@ -53,9 +60,9 @@ def create_product(
         options=options or {},
     )
 
+
 def make_option_key(options: dict | None):
     if not options:
         return ""
     pairs = [f"{k}={options[k]}" for k in sorted(options)]
     return "&".join(pairs)
-
