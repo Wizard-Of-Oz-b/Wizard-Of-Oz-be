@@ -1,4 +1,3 @@
-# domains/carts/urls.py
 from django.urls import path
 
 from .views import CartClearView  # ← 전체 비우기

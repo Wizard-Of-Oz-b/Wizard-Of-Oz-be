@@ -1,4 +1,3 @@
-# domains/catalog/urls_products.py
 from django.urls import path
 
 from ..reviews.views import ProductReviewListCreateAPI

@@ -1,6 +1,7 @@
 # domains/shipments/views.py
 import logging
 import os
+
 from typing import Any, Dict, List
 
 from django.db.models import Q
@@ -310,7 +311,22 @@ class ShipmentTrackAPI(APIView):
             )
         except Exception as e:
             logger.exception("예상치 못한 서버 오류: %s", e)
+
             return Response(
                 {"detail": "internal error"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+            return Response({"detail": "internal error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class CarrierListAPI(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        carriers = [
+            {"code": "04", "name": "CJ대한통운"},
+            {"code": "05", "name": "한진택배"},
+            {"code": "08", "name": "롯데택배"},
+        ]
+        return Response(carriers, status=200)
+

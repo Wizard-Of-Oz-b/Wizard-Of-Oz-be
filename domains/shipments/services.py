@@ -1,4 +1,3 @@
-# domains/shipments/services.py
 from __future__ import annotations
 
 from typing import Any, Dict, Iterable, Optional, Tuple
@@ -51,9 +50,11 @@ def sync_by_tracking(carrier: str, tracking_number: str, adapter=None) -> int:
     raw.setdefault("carrier", carrier)
     raw.setdefault("tracking_number", tracking_number)
 
+
     events = adapter.parse_events(
         raw
     )  # [{occurred_at, status, location, description, ...}, ...]
+
     payload = {
         "carrier": raw.get("carrier"),
         "tracking_number": raw.get("tracking_number"),

@@ -1,4 +1,3 @@
-# domains/accounts/serializers.py
 from __future__ import annotations
 
 import uuid

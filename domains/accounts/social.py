@@ -1,4 +1,3 @@
-# domains/accounts/social.py
 import logging
 import os
 
@@ -24,13 +23,13 @@ def get_provider_keys(provider: str) -> dict:
 
 def _provider_config(provider: str) -> dict:
     p = provider.lower()
-    # ✅ settings.SOCIAL_OAUTH 우선 사용
+    # settings.SOCIAL_OAUTH 우선 사용
     so = getattr(settings, "SOCIAL_OAUTH", {})
     cfg = (so.get(p) or {}).copy()
     if cfg.get("client_id"):  # settings에 제대로 들어있으면 그대로 반환
         return cfg
 
-    # ⬇️ settings에 없거나 비어있으면 env로 폴백
+    # settings에 없거나 비어있으면 env로 폴백
     if p == "google":
         return {
             "client_id": _env("GOOGLE_CLIENT_ID"),
@@ -60,7 +59,7 @@ def _provider_config(provider: str) -> dict:
 
 
 # -------------------------
-# 0) OAuth 인가 URL 생성
+# OAuth 인가 URL 생성
 # -------------------------
 def generate_authorize_url(provider: str, request) -> str:
     """OAuth 인가 URL 생성"""
@@ -126,7 +125,7 @@ def generate_authorize_url(provider: str, request) -> str:
 
 
 # -------------------------
-# 1) 코드 → 토큰 교환
+# 코드 → 토큰 교환
 # -------------------------
 def exchange_code_for_tokens(
     provider: str, code: str, redirect_uri: str, state: str = ""
@@ -188,7 +187,7 @@ def exchange_code_for_tokens(
 
 
 # -------------------------
-# 2) 유저 프로필 조회 → 표준화
+# 유저 프로필 조회 → 표준화
 # 반환: {"provider_uid", "email", "name", "nickname", "picture"}
 # -------------------------
 def fetch_userinfo(provider: str, access_token: str) -> dict:

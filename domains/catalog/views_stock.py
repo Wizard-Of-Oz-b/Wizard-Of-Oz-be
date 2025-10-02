@@ -1,4 +1,3 @@
-# domains/catalog/views_stock.py
 import django_filters as df
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema

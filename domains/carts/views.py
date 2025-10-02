@@ -1,4 +1,3 @@
-# domains/carts/views.py
 from __future__ import annotations
 
 from django.shortcuts import get_object_or_404
@@ -93,7 +92,7 @@ class CartItemAddView(APIView):
         - 응답에서 image_url 절대경로를 위해 serializer context에 request 전달
         - N+1 방지를 위해 product(+images) 프리패치 후 반환
         """
-        # ✅ 페이로드 정규화: product_id -> product (테스트 바디 호환)
+        # 페이로드 정규화: product_id -> product (테스트 바디 호환)
         data = request.data.copy()
         if "product" not in data and "product_id" in data:
             data["product"] = data["product_id"]
@@ -175,9 +174,6 @@ class CartItemUpdateView(APIView):
     def patch(self, request, item_id):
         """
         장바구니 아이템의 수량과 옵션을 함께 업데이트.
-        - quantity: 수량 변경 (선택사항)
-        - option_key: 옵션 키 변경 (선택사항)
-        - options: 옵션 상세 정보 변경 (선택사항)
         """
         ser = UpdateCartItemSerializer(data=request.data)
         ser.is_valid(raise_exception=True)

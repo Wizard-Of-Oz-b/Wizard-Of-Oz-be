@@ -6,3 +6,17 @@ __pycache__/
 .gitignore
 .env
 .env.*
+certbot/
+ssl/
+# --- ignore secrets / certbot stuff ---
+certbot/
+infra/nginx/certbot/
+ssl/
+*.pem
+*.key
+*.crt
+*.der
+__pycache__/
+.venv/
+node_modules/
+.git/

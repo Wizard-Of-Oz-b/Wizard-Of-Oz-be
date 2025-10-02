@@ -1,4 +1,3 @@
-# domains/catalog/views_categories.py
 from __future__ import annotations
 
 from django.db import transaction

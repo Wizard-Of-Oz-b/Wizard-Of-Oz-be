@@ -1,6 +1,3 @@
-"""
-domains/accounts/validators.py 테스트
-"""
 import pytest
 from django.core.exceptions import ValidationError
 from domains.accounts.validators import PasswordComplexityValidator

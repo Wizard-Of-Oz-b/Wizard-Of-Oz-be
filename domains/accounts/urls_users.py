@@ -1,4 +1,3 @@
-# domains/accounts/urls_users.py
 from django.urls import path
 
 from .views import MeView, MySocialAccountDeleteAPI, MySocialAccountListAPI

@@ -1,6 +1,3 @@
-"""
-domains/orders/utils.py 테스트
-"""
 import pytest
 from domains.orders.utils import parse_option_key_safe
 

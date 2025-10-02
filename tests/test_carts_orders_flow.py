@@ -1,4 +1,3 @@
-# tests/test_carts_orders_flow.py
 import pytest
 from rest_framework.test import APIClient
 

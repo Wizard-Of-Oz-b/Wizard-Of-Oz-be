@@ -1,4 +1,3 @@
-# domains/reviews/views.py
 from django.db.models import Avg, Count
 from django.shortcuts import get_object_or_404
 

@@ -1,4 +1,3 @@
-# domains/shipments/admin.py
 from __future__ import annotations
 
 from django.contrib import admin
@@ -65,7 +64,7 @@ class ShipmentAdmin(admin.ModelAdmin):
         "created_at",
     )
 
-    # ❗️'fid' 제거, 실제 존재하는 필드/콜러블만 배치
+    # 'fid' 제거, 실제 존재하는 필드/콜러블만 배치
     readonly_fields = ("id", "created_at", "updated_at", "last_event_at")
 
     # search_fields 는 모델 실제 필드명만 허용됨
@@ -76,7 +75,7 @@ class ShipmentAdmin(admin.ModelAdmin):
         parameter_name = "carrier"
 
         def lookups(self, request, model_admin):
-            # 🚫 동적 결정 대신 DB 실필드인 'carrier'만 사용
+            # 동적 결정 대신 DB 실필드인 'carrier'만 사용
             qs = (
                 models.Shipment.objects.order_by()
                 .values_list("carrier", flat=True)

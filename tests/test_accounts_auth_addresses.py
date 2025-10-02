@@ -1,4 +1,3 @@
-# tests/test_accounts_auth_addresses.py
 import pytest
 from rest_framework.test import APIClient
 

@@ -1,4 +1,3 @@
-# domains/payments/views_toss.py
 from __future__ import annotations
 
 from decimal import Decimal
@@ -60,7 +59,7 @@ class TossConfirmAPI(views.APIView):
                     status=400,
                 )
 
-        # ✅ 4) 재고 사전 검증 (토스 결제 전)
+        #  4) 재고 사전 검증 (토스 결제 전)
         try:
             validate_cart_stock(payment.order.user)
         except (OutOfStockError, StockRowMissing) as e:
@@ -85,7 +84,7 @@ class TossConfirmAPI(views.APIView):
             payment.touch()
             payment.save()
         
-        # ✅ 7) 승인 성공 시점에 OrderItem 생성 (별도 트랜잭션)
+
         if provider_done:
             try:
                 with transaction.atomic():
@@ -100,7 +99,7 @@ class TossConfirmAPI(views.APIView):
                     logger = logging.getLogger(__name__)
                     logger.error(f"토스 결제 취소 실패: {cancel_error}, Payment ID: {payment.id}")
                 
-                # ✅ Payment 상태를 READY로 롤백 (별도 트랜잭션으로 안전하게 처리)
+                #  Payment 상태를 READY로 롤백 (별도 트랜잭션으로 안전하게 처리)
                 with transaction.atomic():
                     payment.status = PaymentStatus.READY
                     payment.save(update_fields=["status"])
@@ -128,8 +127,10 @@ class TossConfirmAPI(views.APIView):
                 order.status = PurchaseStatus.PAID
                 order.save(update_fields=["status"])
 
-                # ✅ 결제 성공 시 장바구니 비우기 (OrderItem 생성 시 이미 처리되지만 안전장치)
+
+                #  결제 성공 시 장바구니 비우기 (OrderItem 생성 시 이미 처리되지만 안전장치)
                 CartItem.objects.filter(cart__user=order.user).delete()
+
 
         return Response(PaymentReadSerializer(payment).data, status=status.HTTP_200_OK)
 
@@ -166,7 +167,6 @@ class TossSyncAPI(views.APIView):
             payment.status = PaymentStatus.PAID
         elif toss_status == "CANCELED":
             payment.status = PaymentStatus.CANCELED
-        # 필요 시 추가 매핑
 
         payment.last_synced_at = timezone.now()
         payment.touch()

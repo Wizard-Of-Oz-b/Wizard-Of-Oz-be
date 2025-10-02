@@ -1,4 +1,3 @@
-# domains/catalog/serializers.py
 from __future__ import annotations
 
 from typing import Any, Iterable, Optional
@@ -126,8 +125,6 @@ class ProductReadSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         )
-
-    # read_only_fields는 fields로 충분하니 생략해도 무방(남겨도 OK)
 
     # --- 이미지 헬퍼 ---
     def _iter_product_images(self, obj: Product) -> Iterable:

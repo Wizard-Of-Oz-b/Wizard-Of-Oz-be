@@ -1,4 +1,3 @@
-# tests/conftest.py
 import pytest
 from uuid import uuid4
 from django.conf import settings
@@ -52,7 +51,7 @@ def user(db):
 
     password = "Test1234!A"
     u = User.objects.create_user(password=password, **kwargs)
-    # ✅ 로그인 테스트용 원문 비밀번호 보관
+    # 로그인 테스트용 원문 비밀번호 보관
     u.raw_password = password
     return u
 
@@ -79,7 +78,7 @@ def admin(db):
     if hasattr(u, "is_superuser"):
         u.is_superuser = True
     u.save(update_fields=[f for f in ["is_staff", "is_superuser"] if hasattr(u, f)])
-    # ✅ 로그인 테스트용 원문 비밀번호 보관
+    # 로그인 테스트용 원문 비밀번호 보관
     u.raw_password = password
     return u
 
@@ -258,7 +257,7 @@ def user_factory(db):
             kw.setdefault("email", email)
 
         u = User.objects.create_user(password=password, **kw)
-        # ✅ 로그인 테스트용 원문 비밀번호 보관
+        # 로그인 테스트용 원문 비밀번호 보관
         u.raw_password = password
         return u
     return _make

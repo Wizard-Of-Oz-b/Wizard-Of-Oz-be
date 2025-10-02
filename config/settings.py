@@ -12,11 +12,7 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")  # .env 로드
 
-# 1) (선택) 컨테이너에서만 .env.docker 읽게 하거나, 아예 주석 처리
-# from dotenv import load_dotenv
-# load_dotenv(BASE_DIR / ".env.docker")  # compose의 env_file만 쓴다면 이 줄도 생략 가능
-
-# 2) 여기서 바로 환경변수 읽기
+# 환경변수 읽기
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-secret")
 
 # "1/true/yes/on" 다 허용 (대소문자 무시)
@@ -105,18 +101,6 @@ def env_multi(*keys, default=None):
             return v
     return default
 
-
-# DATABASES = {
-#     "default": {
-#         "ENGINE": "django.db.backends.postgresql",
-#         "NAME": env_multi("DB_NAME", "POSTGRES_DB", default="shopapi"),
-#         "USER": env_multi("DB_USER", "POSTGRES_USER", default="postgres"),
-#         "PASSWORD": env_multi("DB_PASSWORD", "POSTGRES_PASSWORD", default=""),
-#         "HOST": env_multi("DB_HOST", "POSTGRES_HOST", default="db"),
-#         "PORT": env_multi("DB_PORT", "POSTGRES_PORT", default="5432"),
-#     }
-# }
-
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
@@ -182,7 +166,6 @@ SPECTACULAR_SETTINGS = {
             "BearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"},
         }
     },
-    # ✅ 필드 경로만 사용 (클래스 경로 전부 삭제!)
     "DISABLE_ERRORS_AND_WARNINGS": True,
     "SWAGGER_UI_SETTINGS": {
         "deepLinking": True,
@@ -210,10 +193,11 @@ SIMPLE_JWT = {
 
 # Security / CORS / CSRF
 COOKIE_SECURE = not DEBUG
-SESSION_COOKIE_SECURE = COOKIE_SECURE
-CSRF_COOKIE_SECURE = COOKIE_SECURE
-SESSION_COOKIE_SAMESITE = "Lax"
-CSRF_COOKIE_SAMESITE = "Lax"
+SESSION_COOKIE_SAMESITE = "None"
+CSRF_COOKIE_SAMESITE    = "None"
+SESSION_COOKIE_SECURE   = True
+CSRF_COOKIE_SECURE      = True
+CORS_ALLOW_CREDENTIALS = True
 
 # HTTPS Security Settings
 SECURE_SSL_REDIRECT = str(os.getenv("SECURE_SSL_REDIRECT", "0")).lower() in (
@@ -234,26 +218,24 @@ SECURE_BROWSER_XSS_FILTER = True
 X_FRAME_OPTIONS = "DENY"
 
 CORS_ALLOWED_ORIGINS = [
-    "https://localhost:5173",
-    "https://127.0.0.1:5173",
-    "http://localhost:5173",  # 개발용 (DEBUG=True일 때)
-    "http://127.0.0.1:5173",  # 개발용 (DEBUG=True일 때)
     "https://ozshop-kappa.vercel.app",
+    "https://ozshop-kappa.vercel.app/",
     "https://3-34-164-251.sslip.io",
+    "http://localhost:5173",
+    "https://localhost:5173",
+    "http://127.0.0.1:5173",
+    "https://127.0.0.1:5173",
+    "https://ozshop.duckdns.org",
 ]
-CORS_ALLOW_CREDENTIALS = True
 
 CSRF_TRUSTED_ORIGINS = [
-    "https://localhost:5173",
-    "https://127.0.0.1:5173",
-    "https://localhost:3000",
-    "https://127.0.0.1:3000",
-    "http://localhost:5173",  # 개발용 (DEBUG=True일 때)
-    "http://127.0.0.1:5173",  # 개발용 (DEBUG=True일 때)
-    "http://localhost:3000",  # 개발용 (DEBUG=True일 때)
-    "http://127.0.0.1:3000",  # 개발용 (DEBUG=True일 때)
     "https://ozshop-kappa.vercel.app",
     "https://3-34-164-251.sslip.io",
+    "https://3.34.164.251",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "https://ozshop-kappa.vercel.app/",
+    "https://ozshop.duckdns.org",
 ]
 
 # OAuth / 3rd Party
@@ -287,9 +269,6 @@ TOSS_SECRET_KEY = os.getenv("TOSS_SECRET_KEY", "")
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "domains.accounts.validators.PasswordComplexityValidator"},
-    # (원하면 추가) {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
-    # (원하면 추가) {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
-    # MinimumLength/Numeric은 우리 커스텀에 포함되어 있으니 보통 안 넣습니다.
 ]
 
 # Celery
@@ -330,3 +309,12 @@ DEFAULT_PRODUCT_PLACEHOLDER_URL = "/static/img/product_placeholder.png"
 SHIPMENTS_NOTIFY_WEBHOOK = os.getenv("SHIPMENTS_NOTIFY_WEBHOOK")
 
 APPEND_SLASH = False
+
+
+
+FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "http://localhost:5173")
+FRONTEND_OAUTH_CALLBACK = os.getenv(
+    "FRONTEND_OAUTH_CALLBACK",
+    f"{FRONTEND_BASE_URL.rstrip('/')}/oauth/callback"
+)
+

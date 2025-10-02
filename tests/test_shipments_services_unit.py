@@ -1,4 +1,3 @@
-# tests/test_shipments_services_unit.py
 import pytest
 import domains.shipments.services as svc
 
@@ -35,7 +34,7 @@ def test_upsert_events_idempotent_and_status_rollup(user_factory, product_factor
 
     sh = Shipment.objects.create(
         user=user,
-        order=purchase,                    # ★ order 필수
+        order=purchase,
         carrier="kr.cjlogistics",
         tracking_number="CJT123",
         status=S("PENDING", "PENDING"),
@@ -104,7 +103,7 @@ def test_sync_by_tracking_uses_adapter_and_updates(user_factory, product_factory
 
     sh = Shipment.objects.create(
         user=user,
-        order=purchase,                    # ★ order 필수
+        order=purchase,
         carrier="kr.cjlogistics",
         tracking_number="CJT999",
         status=S("PENDING", "PENDING"),

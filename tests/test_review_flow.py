@@ -1,4 +1,3 @@
-# tests/test_review_flow.py
 import pytest
 from rest_framework.test import APIClient
 from domains.orders.models import Purchase
