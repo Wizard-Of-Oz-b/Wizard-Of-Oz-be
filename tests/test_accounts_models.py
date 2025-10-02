@@ -1,6 +1,8 @@
-import pytest
 from django.contrib.auth import get_user_model
-from domains.accounts.models import UserRole, SocialAccount, UserAddress
+
+import pytest
+
+from domains.accounts.models import SocialAccount, UserAddress, UserRole
 
 User = get_user_model()
 
@@ -46,7 +48,9 @@ class TestUserModel:
         assert str(user_without_email) == "testuser2"
 
         # 이메일이 None인 사용자 (고유한 이메일 사용)
-        user_none_email = user_factory(email="testuser3@example.com", username="testuser3")
+        user_none_email = user_factory(
+            email="testuser3@example.com", username="testuser3"
+        )
         # 이메일이 있으면 이메일을 반환
         assert str(user_none_email) == "testuser3@example.com"
 
@@ -59,11 +63,9 @@ class TestSocialAccountModel:
         """소셜 계정 문자열 표현 테스트 (158번째 줄 커버)"""
         user = user_factory()
         social_account = SocialAccount.objects.create(
-            user=user,
-            provider="google",
-            provider_uid="google_123456"
+            user=user, provider="google", provider_uid="google_123456"
         )
-        
+
         expected_str = f"google:google_123456 -> {user.id}"
         assert str(social_account) == expected_str
 
@@ -81,16 +83,16 @@ class TestUserAddressModel:
             address1="서울시 강남구 테헤란로 123",
             address2="456호",
             postcode="12345",
-            phone="010-1234-5678"
+            phone="010-1234-5678",
         )
-        
+
         expected_str = f"{user.id} / 홍길동 / 서울시 강남구 테헤란로 123"
         assert str(address) == expected_str
 
     def test_user_address_default_constraint(self, user_factory):
         """사용자 기본 주소 제약 조건 테스트"""
         user = user_factory()
-        
+
         # 첫 번째 기본 주소 생성
         address1 = UserAddress.objects.create(
             user=user,
@@ -98,9 +100,9 @@ class TestUserAddressModel:
             address1="서울시 강남구 테헤란로 123",
             postcode="12345",
             phone="010-1234-5678",
-            is_default=True
+            is_default=True,
         )
-        
+
         # 같은 사용자의 두 번째 기본 주소 생성 시도 (제약 조건 위반)
         with pytest.raises(Exception):  # IntegrityError 또는 ValidationError
             UserAddress.objects.create(
@@ -109,5 +111,5 @@ class TestUserAddressModel:
                 address1="서울시 서초구 서초대로 456",
                 postcode="67890",
                 phone="010-9876-5432",
-                is_default=True
+                is_default=True,
             )

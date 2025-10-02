@@ -10,7 +10,7 @@ from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from domains.carts.models import Cart, CartItem
-from domains.carts.services import clear_cart as clear_cart_items  # 장바구니 비우기 헬퍼
+from domains.carts.services import clear_cart as clear_cart_items
 from domains.catalog.services import (
     OutOfStockError,
     StockRowMissing,
@@ -140,7 +140,7 @@ def checkout(user: Any) -> Tuple[Purchase, Any]:
     items_qs = cart.items.select_related("product").order_by("product_id", "option_key")
 
     items_to_create = []
-    line_total_sum = Decimal('0')
+    line_total_sum = Decimal("0")
 
     for it in items_qs:
         from domains.catalog.services import reserve_stock

@@ -1,6 +1,8 @@
 import pytest
 from rest_framework.test import APIClient
+
 from domains.orders.models import Purchase
+
 
 def _extract_items_and_meta(body):
     """
@@ -23,7 +25,7 @@ def _extract_items_and_meta(body):
             if isinstance(maybe, dict) and "results" in maybe:  # A'
                 items = maybe["results"]
                 cnt = cnt if cnt is not None else maybe.get("count")
-            elif isinstance(maybe, list):                       # A
+            elif isinstance(maybe, list):  # A
                 items = maybe
                 cnt = cnt if cnt is not None else len(items)
         # B
@@ -31,7 +33,7 @@ def _extract_items_and_meta(body):
             items = body["results"]
             cnt = body.get("count", len(items))
             avg = body.get("avg_rating")  # 혹시 제공되면 사용
-    elif isinstance(body, list):           # C
+    elif isinstance(body, list):  # C
         items = body
         cnt = len(items)
 
@@ -44,7 +46,9 @@ def test_purchase_then_review(user, product, create_stock):
     create_stock(product, {"size": "M"}, 3)
 
     # 유료구매 이력 주입 → 구매자 조건 충족
-    Purchase.objects.create(user=user, product_id=product.id, status=Purchase.STATUS_PAID)
+    Purchase.objects.create(
+        user=user, product_id=product.id, status=Purchase.STATUS_PAID
+    )
 
     c = APIClient()
     c.force_authenticate(user=user)
@@ -53,7 +57,7 @@ def test_purchase_then_review(user, product, create_stock):
     r = c.post(
         f"/api/v1/products/{product.id}/reviews/",
         {"rating": 5, "content": "좋아요!"},
-        format="json"
+        format="json",
     )
     assert r.status_code in (200, 201), getattr(r, "data", r.content)
 

@@ -1,13 +1,17 @@
 import re
+
+from django.urls import URLPattern, URLResolver, get_resolver
+
 import pytest
-from django.urls import get_resolver, URLPattern, URLResolver
 from rest_framework.test import APIClient
+
 from domains.orders.models import Purchase
 
 # 허용 상태코드 묶음: 존재/권한/규칙 실패까지 넉넉히 허용 (프로젝트 구현 차이를 흡수)
 ALLOW_EXISTS = {200, 201, 202, 204, 400, 401, 403, 404, 405, 409}
 ALLOW_AUTH_FAIL = {401, 403, 404, 405}
 ALLOW_OK_OR_RULE_FAIL = {200, 201, 202, 204, 400, 409, 405}
+
 
 # ─────────────────────────────────────────────────────────────
 # URL 리졸버 전체 스캔 → cancel/refund 경로 자동 발견
@@ -20,17 +24,20 @@ def _iter_routes(resolver=None, prefix=""):
         elif isinstance(entry, URLResolver):
             yield from _iter_routes(entry, prefix + str(entry.pattern))
 
+
 def _fill_params(path: str, pk: str) -> str:
     def repl(m):
         # 어떤 파라미터든 pk로 치환 (<uuid:purchase_id>, <purchase_id>, <pk> 등)
         return pk
-    path = re.sub(r"<[^:>]+:([^>]+)>", repl, path)   # <uuid:purchase_id>
-    path = re.sub(r"<([^>]+)>", repl, path)          # <purchase_id>
+
+    path = re.sub(r"<[^:>]+:([^>]+)>", repl, path)  # <uuid:purchase_id>
+    path = re.sub(r"<([^>]+)>", repl, path)  # <purchase_id>
     if not path.startswith("/"):
         path = "/" + path
     if not path.endswith("/"):
         path = path + "/"
     return path
+
 
 def _find_action_path(pk: str, client: APIClient, action_keyword: str) -> str | None:
     """
@@ -50,12 +57,16 @@ def _find_action_path(pk: str, client: APIClient, action_keyword: str) -> str | 
                 best = best or url
     return best
 
-def _call_action(client: APIClient, p: Purchase, action: str, picked: str | None = None):
+
+def _call_action(
+    client: APIClient, p: Purchase, action: str, picked: str | None = None
+):
     pid = str(p.pk)
     url = picked or _find_action_path(pid, client, action)
     if not url:
         pytest.skip(f"{action} endpoint not found by URL resolver scan")
     return client.post(url)
+
 
 # ─────────────────────────────────────────────────────────────
 # Cancel 권한 테스트
@@ -72,6 +83,7 @@ def test_cancel_requires_auth(user_factory, product_factory):
         pytest.skip("cancel endpoint not found by URL resolver scan")
     r = c.post(picked)
     assert r.status_code in ALLOW_AUTH_FAIL, getattr(r, "data", r.content)
+
 
 @pytest.mark.django_db
 def test_cancel_forbidden_to_non_owner(user_factory, product_factory):
@@ -90,6 +102,7 @@ def test_cancel_forbidden_to_non_owner(user_factory, product_factory):
     # 소유권 숨김 정책이면 404가 올 수도 있음
     assert r.status_code in {403, 404, 405}, getattr(r, "data", r.content)
 
+
 @pytest.mark.django_db
 def test_cancel_allowed_for_owner(user_factory, product_factory):
     owner = user_factory()
@@ -104,6 +117,7 @@ def test_cancel_allowed_for_owner(user_factory, product_factory):
     c.force_authenticate(user=owner)
     r = c.post(picked)
     assert r.status_code in ALLOW_OK_OR_RULE_FAIL, getattr(r, "data", r.content)
+
 
 @pytest.mark.django_db
 def test_cancel_allowed_for_admin(user_factory, product_factory):
@@ -121,6 +135,7 @@ def test_cancel_allowed_for_admin(user_factory, product_factory):
     r = c.post(picked)
     assert r.status_code in ALLOW_OK_OR_RULE_FAIL, getattr(r, "data", r.content)
 
+
 # ─────────────────────────────────────────────────────────────
 # Refund 권한 테스트
 # ─────────────────────────────────────────────────────────────
@@ -136,6 +151,7 @@ def test_refund_requires_auth(user_factory, product_factory):
         pytest.skip("refund endpoint not found by URL resolver scan")
     r = c.post(picked)
     assert r.status_code in ALLOW_AUTH_FAIL, getattr(r, "data", r.content)
+
 
 @pytest.mark.django_db
 def test_refund_forbidden_to_non_owner(user_factory, product_factory):
@@ -153,6 +169,7 @@ def test_refund_forbidden_to_non_owner(user_factory, product_factory):
     r = c.post(picked)
     assert r.status_code in {403, 404}, getattr(r, "data", r.content)
 
+
 @pytest.mark.django_db
 def test_refund_allowed_for_owner(user_factory, product_factory):
     owner = user_factory()
@@ -166,7 +183,10 @@ def test_refund_allowed_for_owner(user_factory, product_factory):
 
     c.force_authenticate(user=owner)
     r = c.post(picked)
-    assert r.status_code in (200, 201, 202, 204, 400, 409, 405, 403), getattr(r, "data", r.content)
+    assert r.status_code in (200, 201, 202, 204, 400, 409, 405, 403), getattr(
+        r, "data", r.content
+    )
+
 
 @pytest.mark.django_db
 def test_refund_allowed_for_admin(user_factory, product_factory):
