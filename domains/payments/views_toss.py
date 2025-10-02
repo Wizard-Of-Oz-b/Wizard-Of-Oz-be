@@ -1,4 +1,3 @@
-# domains/payments/views_toss.py
 from __future__ import annotations
 
 from decimal import Decimal
@@ -77,7 +76,7 @@ class TossConfirmAPI(views.APIView):
             payment.touch()
             payment.save()
         
-        # ✅ 7) OrderItem은 이미 체크아웃에서 생성됨 (confirm에서는 장바구니 확인 안함)
+        #  7) OrderItem은 이미 체크아웃에서 생성됨 (confirm에서는 장바구니 확인 안함)
         if provider_done:
             # OrderItem이 없으면 체크아웃 과정에서 문제가 있었던 것
             from domains.orders.models import OrderItem
@@ -119,8 +118,6 @@ class TossConfirmAPI(views.APIView):
                 order.status = PurchaseStatus.PAID
                 order.save(update_fields=["status"])
 
-                # ✅ 장바구니 비우기는 checkout에서 이미 처리됨
-
         return Response(PaymentReadSerializer(payment).data, status=status.HTTP_200_OK)
 
 
@@ -156,7 +153,6 @@ class TossSyncAPI(views.APIView):
             payment.status = PaymentStatus.PAID
         elif toss_status == "CANCELED":
             payment.status = PaymentStatus.CANCELED
-        # 필요 시 추가 매핑
 
         payment.last_synced_at = timezone.now()
         payment.touch()

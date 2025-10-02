@@ -1,5 +1,3 @@
-# config/middleware.py
-
 from django.utils.deprecation import MiddlewareMixin
 
 class StripCSRFCookieMiddleware(MiddlewareMixin):

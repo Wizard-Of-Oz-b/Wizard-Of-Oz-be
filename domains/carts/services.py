@@ -1,4 +1,3 @@
-# domains/carts/services.py
 from __future__ import annotations
 
 from decimal import Decimal
@@ -79,7 +78,7 @@ def add_or_update_item(
         },
     )
     if not created:
-        # 합산 정책(원하면 대입 정책으로 바꿔도 됨)
+        # 합산 정책
         item.quantity += quantity
         item.unit_price = unit_price  # 최신 단가 스냅샷(원치 않으면 제거)
         item.save(update_fields=["quantity", "unit_price"])

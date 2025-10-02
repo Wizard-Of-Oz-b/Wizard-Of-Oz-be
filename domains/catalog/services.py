@@ -1,4 +1,3 @@
-# domains/catalog/services.py
 from __future__ import annotations
 
 from urllib.parse import parse_qsl, urlencode
@@ -105,7 +104,7 @@ def release_stock(product_id, option_key: str | dict | None, qty: int):
     row.save(update_fields=["stock_quantity"])
 
 
-# (선택) 조회 헬퍼 — 디버깅/점검용
+# 조회 헬퍼 — 디버깅/점검용
 def get_stock_quantity(product_id, option_key: str | dict | None) -> int:
     key = normalize_option_key(option_key)
     try:

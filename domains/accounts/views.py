@@ -1,4 +1,3 @@
-# domains/accounts/views.py
 from django.contrib.auth import get_user_model
 from django.conf import settings
 
@@ -54,7 +53,16 @@ class LoginView(APIView):
         access = str(refresh.access_token)
 
         resp = Response({"access": access, "refresh": str(refresh)}, status=status.HTTP_200_OK)
-        resp.set_cookie("refresh", str(refresh), **refresh_cookie_kwargs(settings.DEBUG))
+        resp.set_cookie(
+            "refresh",
+            str(refresh),
+            httponly=True,
+            secure=True,
+            samesite="None",
+            path="/",
+            domain="ozshop.duckdns.org",
+            max_age=60*60*24*14
+        )
         return resp
 
 
@@ -101,7 +109,7 @@ class LogoutView(APIView):
                 pass
         resp = Response(status=204)
         # refresh_cookie_kwargs에서 path를 "/api/v1/auth/"로 설정했다는 가정 하에 동일 경로로 삭제
-        resp.delete_cookie("refresh", path="/api/v1/auth/")
+        resp.delete_cookie("refresh", path="/", domain="ozshop.duckdns.org")
         return resp
 
 

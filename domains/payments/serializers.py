@@ -6,7 +6,7 @@ class PaymentReadSerializer(serializers.ModelSerializer):
         model = Payment
         fields = (
             "payment_id",
-            "order_id",               # 모델에 없다면 지우세요
+            "order_id",
             "order_number",
             "status",
             "amount_total",
@@ -24,7 +24,6 @@ class PaymentCancelRequestSerializer(serializers.Serializer):
     reason = serializers.CharField(required=False, allow_blank=True)
     cancel_amount = serializers.DecimalField(max_digits=12, decimal_places=2)
     tax_free_amount = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, default=0)
-    # 모델에 order_item FK가 있을 때만 쓰도록 ID로 받음(선택)
     order_item_id = serializers.UUIDField(required=False, allow_null=True)
 
     def save(self, *, payment: Payment, status: str) -> PaymentCancel:

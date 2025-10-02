@@ -1,4 +1,3 @@
-# tests/test_shipments_integration.py
 import pytest
 from domains.orders.models import Purchase
 from domains.shipments import services as svc

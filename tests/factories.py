@@ -1,4 +1,3 @@
-# tests/factories.py
 import itertools
 from uuid import uuid4
 
