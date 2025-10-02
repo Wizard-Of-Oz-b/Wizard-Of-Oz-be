@@ -6,9 +6,11 @@ _ADAPTERS = {
     "kr.cjlogistics": SweetTrackerAdapter,
 }
 
+
 def get_adapter(carrier: str):
     """carrier 코드로 알맞은 어댑터 생성."""
     cls = _ADAPTERS.get((carrier or "").strip().lower(), SweetTrackerAdapter)
     return cls()
+
 
 __all__ = ["get_adapter", "SweetTrackerAdapter"]

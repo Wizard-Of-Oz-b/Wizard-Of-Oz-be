@@ -1,14 +1,23 @@
 # domains/shipments/tasks.py
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
-from celery import shared_task
 import json
-from django.utils.timezone import localtime
-from django.core.serializers.json import DjangoJSONEncoder
+from typing import Any, Dict, Optional
 
-@shared_task(bind=True, max_retries=3, retry_backoff=True, retry_jitter=True, acks_late=True,
-            name="domains.shipments.tasks.poll_shipment")
+from django.core.serializers.json import DjangoJSONEncoder
+from django.utils.timezone import localtime
+
+from celery import shared_task
+
+
+@shared_task(
+    bind=True,
+    max_retries=3,
+    retry_backoff=True,
+    retry_jitter=True,
+    acks_late=True,
+    name="domains.shipments.tasks.poll_shipment",
+)
 def poll_shipment(self, carrier: str, tracking_number: str) -> int:
     """
     단일 운송장 폴링 → 외부 어댑터 조회 → 이벤트 upsert
@@ -16,9 +25,11 @@ def poll_shipment(self, carrier: str, tracking_number: str) -> int:
     """
     try:
         from .services import sync_by_tracking
+
         return int(sync_by_tracking(carrier, tracking_number))
     except Exception as e:
         raise self.retry(exc=e)
+
 
 @shared_task(name="domains.shipments.tasks.poll_open_shipments")
 def poll_open_shipments() -> None:
@@ -26,9 +37,13 @@ def poll_open_shipments() -> None:
     진행중인 건만 순회 폴링
     """
     from .models import Shipment
-    qs = Shipment.objects.filter(status__in=["pending", "in_transit", "out_for_delivery"])
+
+    qs = Shipment.objects.filter(
+        status__in=["pending", "in_transit", "out_for_delivery"]
+    )
     for s in qs.iterator():
         poll_shipment.delay(s.carrier, s.tracking_number)
+
 
 def _dt(v):
     if not v:
@@ -37,6 +52,7 @@ def _dt(v):
         return localtime(v).isoformat()
     except Exception:
         return str(v)
+
 
 @shared_task(name="domains.shipments.tasks.notify_shipment")
 def notify_shipment(shipment_id: str, event_type: str, payload: dict):
@@ -63,7 +79,10 @@ def notify_shipment(shipment_id: str, event_type: str, payload: dict):
             **(payload or {}),
         }
 
-        print("[NOTIFY] " + json.dumps(body, ensure_ascii=False, cls=DjangoJSONEncoder), flush=True)
+        print(
+            "[NOTIFY] " + json.dumps(body, ensure_ascii=False, cls=DjangoJSONEncoder),
+            flush=True,
+        )
 
     except Exception as e:
         print(f"[NOTIFY][ERROR] {e}")

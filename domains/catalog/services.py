@@ -1,21 +1,24 @@
 # domains/catalog/services.py
 from __future__ import annotations
 
+from typing import Any, Dict, Iterable, Tuple
 from urllib.parse import parse_qsl, urlencode
-from typing import Dict, Iterable, Tuple, Any
 
 from django.db import transaction
 from django.db.models import F
+
 from .models import ProductStock
 
 
 class OutOfStockError(Exception):
     """요청 수량보다 재고가 부족할 때"""
+
     pass
 
 
 class StockRowMissing(Exception):
     """해당 (product, option_key) 재고 행이 존재하지 않을 때"""
+
     pass
 
 
@@ -109,28 +112,32 @@ def release_stock(product_id, option_key: str | dict | None, qty: int):
 def get_stock_quantity(product_id, option_key: str | dict | None) -> int:
     key = normalize_option_key(option_key)
     try:
-        return int(ProductStock.objects.get(product_id=product_id, option_key=key).stock_quantity)
+        return int(
+            ProductStock.objects.get(
+                product_id=product_id, option_key=key
+            ).stock_quantity
+        )
     except ProductStock.DoesNotExist:
         return 0
 
 
-def check_stock_availability(product_id, option_key: str | dict | None, required_quantity: int) -> None:
+def check_stock_availability(
+    product_id, option_key: str | dict | None, required_quantity: int
+) -> None:
     """
     재고 가용성 검증 (토스 결제 전 사전 검증용)
     재고 부족 시 OutOfStockError 또는 StockRowMissing 발생
     """
     key = normalize_option_key(option_key)
-    
+
     try:
         stock_row = ProductStock.objects.get(product_id=product_id, option_key=key)
         available_quantity = int(stock_row.stock_quantity)
-        
+
         if available_quantity < required_quantity:
             raise OutOfStockError(
                 f"재고 부족: 상품 {product_id}, 옵션 '{key}', "
                 f"요청 수량 {required_quantity}, 가용 수량 {available_quantity}"
             )
     except ProductStock.DoesNotExist:
-        raise StockRowMissing(
-            f"재고 정보 없음: 상품 {product_id}, 옵션 '{key}'"
-        )
+        raise StockRowMissing(f"재고 정보 없음: 상품 {product_id}, 옵션 '{key}'")

@@ -1,12 +1,12 @@
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
-from django.urls import path, include
-from django.views.generic import RedirectView
 from django.http import HttpResponse, JsonResponse
-from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
+from django.urls import include, path
+from django.views.generic import RedirectView
 
 from drf_spectacular.renderers import OpenApiJsonRenderer
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from rest_framework.permissions import AllowAny
 
 from domains.shipments.views import ShipmentWebhookAPI
@@ -28,34 +28,34 @@ class OpenAPIV1JSON(SpectacularAPIView):
     permission_classes = [AllowAny]
     renderer_classes = [OpenApiJsonRenderer]
 
+
 urlpatterns = [
     # Django admin
     path("admin/", admin.site.urls),
-
     # ✅ v1 스키마 & Swagger (둘 다 동일 스키마 보게)
     path("api/v1/schema/", OpenAPIV1JSON.as_view(), name="v1-schema"),
-    path("api/v1/docs/", SpectacularSwaggerView.as_view(url_name="v1-schema"), name="v1-docs"),
-
+    path(
+        "api/v1/docs/",
+        SpectacularSwaggerView.as_view(url_name="v1-schema"),
+        name="v1-docs",
+    ),
     # ✅ 글로벌 경로도 v1 스키마로 통일 (JSON 고정)
     path("api/schema/", OpenAPIV1JSON.as_view(), name="schema"),
-    path("api/docs/", SpectacularSwaggerView.as_view(url_name="v1-schema"), name="docs"),
-
+    path(
+        "api/docs/", SpectacularSwaggerView.as_view(url_name="v1-schema"), name="docs"
+    ),
     # API v1 엔드포인트 (그대로 유지)
     path("api/v1/shipments/", include("domains.shipments.urls")),
     path("api/v1/", include("api.v1.urls")),
-
-
     # ✅ 최종 명세 경로 (그대로)
     path(
         "api/v1/webhooks/shipments/<str:carrier>/",
         ShipmentWebhookAPI.as_view(),
         name="shipment-webhook-root",
     ),
-
     # 루트 리다이렉트는 원하면 /api/v1/docs 로 바꿔도 됨
     path("oauth/callback", oauth_debug_callback),
     path("", RedirectView.as_view(url="/api/docs", permanent=False)),
-
     # 헬스체크
     path("healthz/", healthz),
 ]
@@ -65,4 +65,3 @@ if settings.DEBUG:
     # 개발 환경에서만 미디어/정적 파일 서빙
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
-

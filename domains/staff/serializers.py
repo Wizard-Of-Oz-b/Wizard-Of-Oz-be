@@ -1,10 +1,14 @@
 # domains/staff/serializers.py
 from django.contrib.auth import get_user_model
+
 from rest_framework import serializers
 
 from domains.catalog.models import (
-    Category, Product, ProductStock,
-    CategoryLevel, ProductImage,
+    Category,
+    CategoryLevel,
+    Product,
+    ProductImage,
+    ProductStock,
 )
 from domains.orders.models import Purchase
 
@@ -29,17 +33,32 @@ class CategoryAdminSerializer(serializers.ModelSerializer):
     parent = serializers.PrimaryKeyRelatedField(
         queryset=Category.objects.all(), allow_null=True, required=False
     )
-    level = serializers.ChoiceField(choices=CategoryLevel.choices, read_only=True)  # parent로 자동
+    level = serializers.ChoiceField(
+        choices=CategoryLevel.choices, read_only=True
+    )  # parent로 자동
     path = serializers.CharField(read_only=True)
     children_count = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Category
         fields = [
-            "id", "name", "parent", "level", "path", "children_count",
-            "created_at", "updated_at",
+            "id",
+            "name",
+            "parent",
+            "level",
+            "path",
+            "children_count",
+            "created_at",
+            "updated_at",
         ]
-        read_only_fields = ["id", "level", "path", "children_count", "created_at", "updated_at"]
+        read_only_fields = [
+            "id",
+            "level",
+            "path",
+            "children_count",
+            "created_at",
+            "updated_at",
+        ]
 
     def get_children_count(self, obj) -> int:
         return obj.children.count()
@@ -64,8 +83,15 @@ class ProductAdminSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
         fields = [
-            "id", "name", "price", "category", "category_path",
-            "options", "is_active", "created_at", "updated_at",
+            "id",
+            "name",
+            "price",
+            "category",
+            "category_path",
+            "options",
+            "is_active",
+            "created_at",
+            "updated_at",
         ]
         read_only_fields = ["id", "category_path", "created_at", "updated_at"]
 
@@ -83,9 +109,14 @@ class ProductStockAdminSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductStock
         fields = [
-            "id", "product", "product_name",
-            "option_key", "options", "stock_quantity",
-            "created_at", "updated_at",
+            "id",
+            "product",
+            "product_name",
+            "option_key",
+            "options",
+            "stock_quantity",
+            "created_at",
+            "updated_at",
         ]
         read_only_fields = ["id", "product_name", "created_at", "updated_at"]
 
@@ -101,8 +132,14 @@ class PurchaseAdminSerializer(serializers.ModelSerializer):
         model = Purchase
         # PK가 purchase_id가 아니라 id라면 여기서 교체하세요.
         fields = [
-            "purchase_id", "user", "user_email",
-            "status", "purchased_at", "pg", "pg_tid", "amount",
+            "purchase_id",
+            "user",
+            "user_email",
+            "status",
+            "purchased_at",
+            "pg",
+            "pg_tid",
+            "amount",
         ]
         read_only_fields = ["purchase_id", "user_email", "purchased_at"]
 
@@ -123,16 +160,29 @@ class ProductImageAdminSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductImage
         fields = [
-            "id", "product", "stock",
-            "image", "remote_url", "is_remote",
-            "file_url", "image_url",
-            "alt_text", "caption",
-            "is_main", "display_order",
+            "id",
+            "product",
+            "stock",
+            "image",
+            "remote_url",
+            "is_remote",
+            "file_url",
+            "image_url",
+            "alt_text",
+            "caption",
+            "is_main",
+            "display_order",
             "product_name",
-            "created_at", "updated_at",
+            "created_at",
+            "updated_at",
         ]
         read_only_fields = [
-            "id", "file_url", "image_url", "product_name", "created_at", "updated_at"
+            "id",
+            "file_url",
+            "image_url",
+            "product_name",
+            "created_at",
+            "updated_at",
         ]
 
     def get_file_url(self, obj):
@@ -169,7 +219,9 @@ class ProductImageAdminSerializer(serializers.ModelSerializer):
             if self.instance:
                 qs = qs.exclude(pk=self.instance.pk)
             if qs.exists():
-                raise serializers.ValidationError({"is_main": "이미 대표 이미지가 존재합니다."})
+                raise serializers.ValidationError(
+                    {"is_main": "이미 대표 이미지가 존재합니다."}
+                )
 
         # 파일/원격 입력 유효성
         is_remote = attrs.get("is_remote", getattr(self.instance, "is_remote", False))
@@ -177,12 +229,21 @@ class ProductImageAdminSerializer(serializers.ModelSerializer):
         has_remote = "remote_url" in attrs and attrs.get("remote_url")
 
         if is_remote:
-            if not (has_remote or (self.instance and getattr(self.instance, "remote_url", None))):
-                raise serializers.ValidationError({"remote_url": "is_remote=True면 remote_url이 필요합니다."})
+            if not (
+                has_remote
+                or (self.instance and getattr(self.instance, "remote_url", None))
+            ):
+                raise serializers.ValidationError(
+                    {"remote_url": "is_remote=True면 remote_url이 필요합니다."}
+                )
             # 원격 모드에서는 image를 굳이 요구하지 않음
         else:
-            if not (has_image or (self.instance and getattr(self.instance, "image", None))):
-                raise serializers.ValidationError({"image": "is_remote=False면 image 파일이 필요합니다."})
+            if not (
+                has_image or (self.instance and getattr(self.instance, "image", None))
+            ):
+                raise serializers.ValidationError(
+                    {"image": "is_remote=False면 image 파일이 필요합니다."}
+                )
 
         return attrs
 
@@ -197,15 +258,23 @@ class ProductImagesUploadSerializer(serializers.Serializer):
     # True → URL만 참조(다운로드 X), False → URL을 다운로드해서 파일 저장
     save_remote = serializers.BooleanField(required=False, default=False)
 
-    main_index   = serializers.IntegerField(required=False, default=-1, help_text="대표로 지정할 업로드 파일 인덱스(0부터)")
+    main_index = serializers.IntegerField(
+        required=False, default=-1, help_text="대표로 지정할 업로드 파일 인덱스(0부터)"
+    )
     replace_main = serializers.BooleanField(required=False, default=False)
-    start_order  = serializers.IntegerField(required=False, default=0)
-    alt_texts    = serializers.ListField(child=serializers.CharField(allow_blank=True), required=False)
-    captions     = serializers.ListField(child=serializers.CharField(allow_blank=True), required=False)
+    start_order = serializers.IntegerField(required=False, default=0)
+    alt_texts = serializers.ListField(
+        child=serializers.CharField(allow_blank=True), required=False
+    )
+    captions = serializers.ListField(
+        child=serializers.CharField(allow_blank=True), required=False
+    )
 
     def validate(self, data):
         images = data.get("images") or []
-        urls   = data.get("image_urls") or []
+        urls = data.get("image_urls") or []
         if not images and not urls:
-            raise serializers.ValidationError("images 또는 image_urls 중 최소 하나는 필요합니다.")
+            raise serializers.ValidationError(
+                "images 또는 image_urls 중 최소 하나는 필요합니다."
+            )
         return data

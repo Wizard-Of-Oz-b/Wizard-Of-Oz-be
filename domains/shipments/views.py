@@ -1,25 +1,27 @@
 # domains/shipments/views.py
+import logging
+import os
 from typing import Any, Dict, List
-import os, logging, requests
-from rest_framework import views
-from django.shortcuts import get_object_or_404
+
 from django.db.models import Q
-from rest_framework import status, parsers, permissions
+from django.shortcuts import get_object_or_404
+
+import requests
+from drf_spectacular.utils import OpenApiParameter, extend_schema
+from rest_framework import parsers, permissions, status, views
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from drf_spectacular.utils import extend_schema, OpenApiParameter
 
 from domains.orders.models import Purchase  # Shipment.order FK 대상
+
 from .models import Shipment
-from .serializers import (
-    RegisterShipmentSerializer,  # POST /register 입력
-    WebhookInSerializer,         # 어댑터 이벤트 입력
-    ShipmentSerializer,          # 공통 출력
-)
+from .serializers import RegisterShipmentSerializer  # POST /register 입력
+from .serializers import ShipmentSerializer  # 공통 출력
+from .serializers import WebhookInSerializer  # 어댑터 이벤트 입력
 from .services import (
     register_tracking_with_sweettracker,
-    upsert_events_from_adapter,
     sync_by_tracking,
+    upsert_events_from_adapter,
 )
 
 
@@ -44,9 +46,21 @@ class ShipmentsListAPI(APIView):
 
     @extend_schema(
         parameters=[
-            OpenApiParameter(name="page", required=False, type=int, description="page number (1-base)"),
-            OpenApiParameter(name="size", required=False, type=int, description="page size"),
-            OpenApiParameter(name="order_id", required=False, type=str, description="filter shipments by order ID"),
+            OpenApiParameter(
+                name="page",
+                required=False,
+                type=int,
+                description="page number (1-base)",
+            ),
+            OpenApiParameter(
+                name="size", required=False, type=int, description="page size"
+            ),
+            OpenApiParameter(
+                name="order_id",
+                required=False,
+                type=str,
+                description="filter shipments by order ID",
+            ),
         ],
         responses={200: ShipmentSerializer(many=True)},
     )
@@ -60,19 +74,20 @@ class ShipmentsListAPI(APIView):
         role = getattr(user, "role", "user")
 
         qs = Shipment.objects.select_related("order").order_by("-created_at")
-        
+
         # Filter by order_id if provided
-        order_id = request.query_params.get('order_id')
+        order_id = request.query_params.get("order_id")
         if order_id:
             # Validate UUID format before filtering
             import uuid
+
             try:
                 uuid.UUID(order_id)
                 qs = qs.filter(order__purchase_id=order_id)
             except (ValueError, TypeError):
                 # Invalid UUID format - return empty queryset
                 qs = qs.none()
-        
+
         if role not in ("admin", "manager", "cs"):
             qs = qs.filter(Q(user=user) | Q(order__user=user))
 
@@ -122,7 +137,9 @@ class RegisterShipmentAPI(APIView):
     parser_classes = [parsers.JSONParser]
     permission_classes = [IsManagerOrAbove]
 
-    @extend_schema(request=RegisterShipmentSerializer, responses={201: ShipmentSerializer})
+    @extend_schema(
+        request=RegisterShipmentSerializer, responses={201: ShipmentSerializer}
+    )
     def post(self, request):
         ser = RegisterShipmentSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
@@ -147,7 +164,9 @@ class RegisterShipmentAPI(APIView):
             user=owner,
             order=purchase,
         )
-        return Response(ShipmentSerializer(shipment).data, status=status.HTTP_201_CREATED)
+        return Response(
+            ShipmentSerializer(shipment).data, status=status.HTTP_201_CREATED
+        )
 
 
 # --------------------------------------------------------------------
@@ -178,7 +197,9 @@ class ShipmentSyncAPI(APIView):
                 purchase = get_object_or_404(Purchase, pk=purchase_id, user=user)
                 owner = user
 
-            existed = Shipment.objects.filter(order=purchase, tracking_number=tracking_number).exists()
+            existed = Shipment.objects.filter(
+                order=purchase, tracking_number=tracking_number
+            ).exists()
 
             register_tracking_with_sweettracker(
                 tracking_number=tracking_number,
@@ -186,7 +207,9 @@ class ShipmentSyncAPI(APIView):
                 user=owner,
                 order=purchase,
             )
-            created_events = sync_by_tracking(carrier=carrier, tracking_number=tracking_number)
+            created_events = sync_by_tracking(
+                carrier=carrier, tracking_number=tracking_number
+            )
             # 외부 계약: "created"는 shipment 기준 idempotent 의미로 반환
             return Response({"created": 0 if existed else 1}, status=status.HTTP_200_OK)
 
@@ -219,6 +242,7 @@ class ShipmentWebhookAPI(APIView):
 
 logger = logging.getLogger(__name__)
 
+
 class ShipmentTrackAPI(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -235,7 +259,10 @@ class ShipmentTrackAPI(APIView):
         host = os.getenv("SMARTPARCEL_HOST", "").rstrip("/")
         if not host:
             logger.error("SMARTPARCEL_HOST env가 비어 있음")
-            return Response({"detail": "SMARTPARCEL_HOST 미설정"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(
+                {"detail": "SMARTPARCEL_HOST 미설정"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
         url = f"{host}/track"
         params = {"carrier": carrier, "invoice": invoice}
@@ -245,12 +272,18 @@ class ShipmentTrackAPI(APIView):
             resp = requests.get(url, params=params, headers=headers, timeout=10)
             # 200~299만 통과, 나머지는 그대로 프록시 상태코드/본문 전달
             if not (200 <= resp.status_code < 300):
-                logger.warning("Proxy non-2xx: %s %s", resp.status_code, resp.text[:500])
+                logger.warning(
+                    "Proxy non-2xx: %s %s", resp.status_code, resp.text[:500]
+                )
                 # JSON이면 그대로, 아니면 메시지 감싸서 반환
                 try:
                     data = resp.json()
                 except Exception:
-                    data = {"detail": "upstream error", "status_code": resp.status_code, "body": resp.text[:500]}
+                    data = {
+                        "detail": "upstream error",
+                        "status_code": resp.status_code,
+                        "body": resp.text[:500],
+                    }
                 return Response(data, status=resp.status_code)
 
             # 정상
@@ -258,16 +291,26 @@ class ShipmentTrackAPI(APIView):
                 data = resp.json()
             except Exception as e:
                 logger.exception("Proxy JSON 디코드 실패: %s", e)
-                return Response({"detail": "invalid upstream json"}, status=status.HTTP_502_BAD_GATEWAY)
+                return Response(
+                    {"detail": "invalid upstream json"},
+                    status=status.HTTP_502_BAD_GATEWAY,
+                )
 
             return Response(data, status=status.HTTP_200_OK)
 
         except requests.Timeout:
             logger.exception("Proxy timeout")
-            return Response({"detail": "upstream timeout"}, status=status.HTTP_504_GATEWAY_TIMEOUT)
+            return Response(
+                {"detail": "upstream timeout"}, status=status.HTTP_504_GATEWAY_TIMEOUT
+            )
         except requests.RequestException as e:
             logger.exception("Proxy request error: %s", e)
-            return Response({"detail": "upstream request error"}, status=status.HTTP_502_BAD_GATEWAY)
+            return Response(
+                {"detail": "upstream request error"}, status=status.HTTP_502_BAD_GATEWAY
+            )
         except Exception as e:
             logger.exception("예상치 못한 서버 오류: %s", e)
-            return Response({"detail": "internal error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(
+                {"detail": "internal error"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )

@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 import uuid
+
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.base_user import BaseUserManager
 from django.contrib.auth.hashers import check_password
 from django.contrib.auth.password_validation import validate_password
 from django.utils.text import slugify
+
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
@@ -38,6 +40,7 @@ class TokenResponseSerializer(serializers.Serializer):
 
 class TokenPairResponseSerializer(serializers.Serializer):
     """access + refresh 동시 응답용 (스키마 문서화)"""
+
     access = serializers.CharField()
     refresh = serializers.CharField()
 
@@ -59,13 +62,23 @@ def username_from_email(email: str) -> str:
 # ─────────────────────────────────────────────────────────────
 class RegisterSerializer(serializers.ModelSerializer):
     """회원가입: username이 없으면 이메일 기반으로 자동 생성"""
-    password = serializers.CharField(write_only=True, min_length=8, max_length=16, trim_whitespace=False)
+
+    password = serializers.CharField(
+        write_only=True, min_length=8, max_length=16, trim_whitespace=False
+    )
     # username은 옵션 (없으면 자동 생성)
     username = serializers.CharField(required=False, allow_blank=True)
 
     class Meta:
         model = User
-        fields = ("email", "username", "password", "nickname", "phone_number", "address")
+        fields = (
+            "email",
+            "username",
+            "password",
+            "nickname",
+            "phone_number",
+            "address",
+        )
 
     def validate(self, data):
         email = normalize_email(data.get("email", ""))
@@ -78,7 +91,9 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     def create(self, validated):
         email = validated["email"]
-        username = (validated.get("username") or "").strip() or username_from_email(email)
+        username = (validated.get("username") or "").strip() or username_from_email(
+            email
+        )
         password = validated["password"]
 
         user = User(
@@ -95,6 +110,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 class LoginRequestSerializer(serializers.Serializer):
     """email 또는 username + password 허용"""
+
     email = serializers.EmailField(required=False, allow_blank=True)
     username = serializers.CharField(required=False, allow_blank=True)
     password = serializers.CharField(write_only=True, trim_whitespace=False)
@@ -107,13 +123,19 @@ class LoginRequestSerializer(serializers.Serializer):
         if not password:
             raise serializers.ValidationError({"password": "This field is required."})
         if not email and not username:
-            raise serializers.ValidationError({"detail": "email or username is required."})
+            raise serializers.ValidationError(
+                {"detail": "email or username is required."}
+            )
 
         # email만 왔으면 username 매핑
         if email and not username:
             try:
                 u = User.objects.get(email__iexact=normalize_email(email))
-                username = getattr(u, "username", None) or getattr(u, User.USERNAME_FIELD, None) or ""
+                username = (
+                    getattr(u, "username", None)
+                    or getattr(u, User.USERNAME_FIELD, None)
+                    or ""
+                )
             except User.DoesNotExist:
                 raise serializers.ValidationError({"detail": "Invalid credentials"})
 
@@ -124,14 +146,22 @@ class LoginRequestSerializer(serializers.Serializer):
 
 class LoginSerializer(LoginRequestSerializer):
     """LoginView에서 실제 인증 수행"""
+
     def validate(self, attrs):
         attrs = super().validate(attrs)
-        user = authenticate(self.context.get("request"), username=attrs["username"], password=attrs["password"])
+        user = authenticate(
+            self.context.get("request"),
+            username=attrs["username"],
+            password=attrs["password"],
+        )
         if not user:
             # 동일 메시지로 노출 (보안)
             raise serializers.ValidationError({"detail": "Invalid credentials"})
 
-        if not getattr(user, "is_active", True) or getattr(user, "status", "") == "deleted":
+        if (
+            not getattr(user, "is_active", True)
+            or getattr(user, "status", "") == "deleted"
+        ):
             raise serializers.ValidationError({"detail": "Inactive or deleted account"})
 
         attrs["user"] = user
@@ -143,6 +173,7 @@ class LoginSerializer(LoginRequestSerializer):
 # ─────────────────────────────────────────────────────────────
 class MeSerializer(serializers.ModelSerializer):
     """내 정보 조회용 (GET /users/me) — 안전한 필드만 노출"""
+
     user_id = serializers.UUIDField(source="id", read_only=True)
     role = serializers.CharField(read_only=True)
     name = serializers.SerializerMethodField()
@@ -180,17 +211,37 @@ class MeUpdateSerializer(serializers.ModelSerializer):
     - name -> first_name 로 매핑
     - 비밀번호 변경(current/new) 옵션
     """
-    name = serializers.CharField(source="first_name", required=False, allow_blank=True, max_length=150)
+
+    name = serializers.CharField(
+        source="first_name", required=False, allow_blank=True, max_length=150
+    )
     nickname = serializers.CharField(required=False, allow_blank=True, max_length=150)
-    phone_number = serializers.CharField(required=False, allow_blank=True, max_length=50)
+    phone_number = serializers.CharField(
+        required=False, allow_blank=True, max_length=50
+    )
     address = serializers.CharField(required=False, allow_blank=True)
 
-    current_password = serializers.CharField(write_only=True, required=False, trim_whitespace=False)
-    new_password = serializers.CharField(write_only=True, required=False, min_length=8, max_length=16, trim_whitespace=False)
+    current_password = serializers.CharField(
+        write_only=True, required=False, trim_whitespace=False
+    )
+    new_password = serializers.CharField(
+        write_only=True,
+        required=False,
+        min_length=8,
+        max_length=16,
+        trim_whitespace=False,
+    )
 
     class Meta:
         model = User
-        fields = ("name", "nickname", "phone_number", "address", "current_password", "new_password")
+        fields = (
+            "name",
+            "nickname",
+            "phone_number",
+            "address",
+            "current_password",
+            "new_password",
+        )
 
     def validate(self, data):
         cur = data.get("current_password")
@@ -198,12 +249,18 @@ class MeUpdateSerializer(serializers.ModelSerializer):
 
         # 둘 중 하나만 오면 오류
         if (cur is None) ^ (new is None):
-            raise serializers.ValidationError({"new_password": "current_password와 new_password는 함께 보내야 합니다."})
+            raise serializers.ValidationError(
+                {
+                    "new_password": "current_password와 new_password는 함께 보내야 합니다."
+                }
+            )
 
         if new:
             user = self.instance or self.context.get("request").user
             if not check_password(cur or "", user.password):
-                raise serializers.ValidationError({"current_password": "현재 비밀번호가 올바르지 않습니다."})
+                raise serializers.ValidationError(
+                    {"current_password": "현재 비밀번호가 올바르지 않습니다."}
+                )
             validate_password(new, user=user)
         return data
 

@@ -1,39 +1,39 @@
 # domains/orders/views.py
 from __future__ import annotations
 
-import django_filters as df
 from django.db import transaction
-from django_filters.rest_framework import DjangoFilterBackend
 
+import django_filters as df
+from django_filters.rest_framework import DjangoFilterBackend
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import generics, permissions, status, views
+from rest_framework.exceptions import ValidationError
 from rest_framework.filters import OrderingFilter
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.exceptions import ValidationError
 
-from drf_spectacular.utils import extend_schema, OpenApiParameter
-from drf_spectacular.types import OpenApiTypes
-
-from domains.orders.models import Purchase, OrderItem
-from .serializers import (
-    PurchaseReadSerializer,
-    PurchaseWriteSerializer,
-    PurchaseReadyReadSerializer,
-    OrderItemReadSerializer,
-)
-from shared.permissions import IsOwnerOrAdmin
-from shared.pagination import StandardResultsSetPagination
-
-from domains.carts.services import get_user_cart
-from domains.orders.utils import parse_option_key_safe
-from .services import (
-    cancel_purchase,
-    refund_purchase,
-    checkout_user_cart,
-)
-from .services import checkout, EmptyCartError
 from domains.carts.models import CartItem
+from domains.carts.services import get_user_cart
+from domains.orders.models import OrderItem, Purchase
+from domains.orders.utils import parse_option_key_safe
+from shared.pagination import StandardResultsSetPagination
+from shared.permissions import IsOwnerOrAdmin
+
+from .serializers import (
+    OrderItemReadSerializer,
+    PurchaseReadSerializer,
+    PurchaseReadyReadSerializer,
+    PurchaseWriteSerializer,
+)
+from .services import (
+    EmptyCartError,
+    cancel_purchase,
+    checkout,
+    checkout_user_cart,
+    refund_purchase,
+)
 
 
 # -------------------------------
@@ -59,6 +59,7 @@ class PurchaseListCreateAPI(generics.ListCreateAPIView):
     GET  /api/v1/purchases        (관리자만, 필터/정렬/페이징)
     POST /api/v1/purchases        (로그인 필요, 결제 성공으로 간주하여 구매 생성)
     """
+
     queryset = Purchase.objects.all().order_by("-purchased_at")
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_class = PurchaseFilter
@@ -73,7 +74,11 @@ class PurchaseListCreateAPI(generics.ListCreateAPIView):
         )
 
     def get_serializer_class(self):
-        return PurchaseWriteSerializer if self.request.method == "POST" else PurchaseReadSerializer
+        return (
+            PurchaseWriteSerializer
+            if self.request.method == "POST"
+            else PurchaseReadSerializer
+        )
 
     @extend_schema(operation_id="ListPurchases")
     def get(self, *args, **kwargs):
@@ -118,15 +123,21 @@ class PurchaseCreateAPI(generics.CreateAPIView):
 # -------------------------------
 class PurchaseMeListAPI(generics.ListAPIView):
     """GET /api/v1/purchases/me"""
+
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = PurchaseReadSerializer
     pagination_class = StandardResultsSetPagination
     queryset = Purchase.objects.none()
 
     def get_queryset(self):
-        if getattr(self, "swagger_fake_view", False) or not self.request.user.is_authenticated:
+        if (
+            getattr(self, "swagger_fake_view", False)
+            or not self.request.user.is_authenticated
+        ):
             return Purchase.objects.none()
-        return Purchase.objects.filter(user_id=self.request.user.id).order_by("-purchased_at")
+        return Purchase.objects.filter(user_id=self.request.user.id).order_by(
+            "-purchased_at"
+        )
 
 
 # -------------------------------
@@ -134,6 +145,7 @@ class PurchaseMeListAPI(generics.ListAPIView):
 # -------------------------------
 class PurchaseMeReadyListAPI(generics.ListAPIView):
     """GET /api/v1/purchases/me/ready - 결제 대기 주문만 조회"""
+
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = PurchaseReadyReadSerializer  # 전용 시리얼라이저 사용
     pagination_class = StandardResultsSetPagination
@@ -150,25 +162,46 @@ class PurchaseMeReadyListAPI(generics.ListAPIView):
                 "items": {
                     "type": "object",
                     "properties": {
-                        "purchase_id": {"type": "string", "format": "uuid", "description": "주문 ID (결제 API에서 orderId로 사용)"},
-                        "order_id": {"type": "string", "format": "uuid", "description": "주문 ID (purchase_id와 동일)"},
-                        "status": {"type": "string", "description": "주문 상태 (ready)"},
-                        "items_total": {"type": "string", "description": "상품 총액 (결제 금액)"},
-                        "purchased_at": {"type": "string", "format": "date-time", "description": "주문 생성 시간"},
-                    }
-                }
+                        "purchase_id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "description": "주문 ID (결제 API에서 orderId로 사용)",
+                        },
+                        "order_id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "description": "주문 ID (purchase_id와 동일)",
+                        },
+                        "status": {
+                            "type": "string",
+                            "description": "주문 상태 (ready)",
+                        },
+                        "items_total": {
+                            "type": "string",
+                            "description": "상품 총액 (결제 금액)",
+                        },
+                        "purchased_at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "주문 생성 시간",
+                        },
+                    },
+                },
             }
-        }
+        },
     )
     def get(self, *args, **kwargs):
         return super().get(*args, **kwargs)
 
     def get_queryset(self):
-        if getattr(self, "swagger_fake_view", False) or not self.request.user.is_authenticated:
+        if (
+            getattr(self, "swagger_fake_view", False)
+            or not self.request.user.is_authenticated
+        ):
             return Purchase.objects.none()
         return Purchase.objects.filter(
             user_id=self.request.user.id,
-            status=Purchase.STATUS_READY  # ready 상태만 필터링
+            status=Purchase.STATUS_READY,  # ready 상태만 필터링
         ).order_by("-purchased_at")
 
 
@@ -177,6 +210,7 @@ class PurchaseMeReadyListAPI(generics.ListAPIView):
 # -------------------------------
 class PurchaseDetailAPI(generics.RetrieveAPIView):
     """GET /api/v1/purchases/{purchase_id}"""
+
     lookup_url_kwarg = "purchase_id"
     queryset = Purchase.objects.all()
     permission_classes = [IsOwnerOrAdmin]
@@ -264,7 +298,9 @@ class CheckoutView(APIView):
         for ci in cart.items.select_related("product"):
             if ci.option_key:
                 if not parse_option_key_safe(ci.option_key):
-                    raise ValidationError({"option_key": f"옵션 형식이 잘못되었습니다: {ci.option_key}"})
+                    raise ValidationError(
+                        {"option_key": f"옵션 형식이 잘못되었습니다: {ci.option_key}"}
+                    )
 
         # 3) 체크아웃 실행
         purchases = checkout_user_cart(request.user, clear_cart=True)
@@ -318,7 +354,7 @@ class CheckoutAPI(views.APIView):
 
         # ✅ 여기서 반드시 top-level "id" 포함 (= purchase_id)
         resp = {
-            "id": str(order.purchase_id),                # ← 테스트 호환 키 (필수)
+            "id": str(order.purchase_id),  # ← 테스트 호환 키 (필수)
             "order_id": str(order.purchase_id),
             "purchase_id": str(order.purchase_id),
             "payment_id": str(payment.payment_id),
@@ -329,6 +365,7 @@ class CheckoutAPI(views.APIView):
         }
         return Response(resp, status=status.HTTP_201_CREATED)
 
+
 # ======================================================================
 # OrderItem 조회 API
 # ======================================================================
@@ -338,13 +375,16 @@ class OrderItemListAPI(generics.ListAPIView):
     - 본인 주문만 조회 가능(관리자는 전체)
     - 필터: product_id, option_key
     """
+
     serializer_class = OrderItemReadSerializer
     permission_classes = [permissions.IsAuthenticated]
     pagination_class = StandardResultsSetPagination
 
     def get_queryset(self):
         purchase_id = self.kwargs["purchase_id"]
-        qs = OrderItem.objects.select_related("order", "product").filter(order__purchase_id=purchase_id)
+        qs = OrderItem.objects.select_related("order", "product").filter(
+            order__purchase_id=purchase_id
+        )
         if not self.request.user.is_staff:
             qs = qs.filter(order__user=self.request.user)
         product_id = self.request.query_params.get("product_id")
@@ -358,8 +398,12 @@ class OrderItemListAPI(generics.ListAPIView):
     @extend_schema(
         operation_id="ListOrderItemsByOrder",
         parameters=[
-            OpenApiParameter("product_id", OpenApiTypes.STR, OpenApiParameter.QUERY, required=False),
-            OpenApiParameter("option_key", OpenApiTypes.STR, OpenApiParameter.QUERY, required=False),
+            OpenApiParameter(
+                "product_id", OpenApiTypes.STR, OpenApiParameter.QUERY, required=False
+            ),
+            OpenApiParameter(
+                "option_key", OpenApiTypes.STR, OpenApiParameter.QUERY, required=False
+            ),
         ],
         responses={200: OrderItemReadSerializer(many=True)},
     )
@@ -372,6 +416,7 @@ class _IsOwnerOrAdmin(permissions.BasePermission):
     - Admin: 항상 허용
     - 일반 유저: 자신의 주문(Order.purchase_id)의 아이템만 허용
     """
+
     def has_permission(self, request, view):
         return request.user and request.user.is_authenticated
 
@@ -385,6 +430,7 @@ class OrderItemDetailAPI(generics.RetrieveAPIView):
     """
     GET /api/v1/orders/order-items/{item_id}/
     """
+
     lookup_url_kwarg = "item_id"
     serializer_class = OrderItemReadSerializer
     permission_classes = [_IsOwnerOrAdmin]
@@ -395,6 +441,8 @@ class OrderItemDetailAPI(generics.RetrieveAPIView):
             qs = qs.filter(order__user=self.request.user)
         return qs
 
-    @extend_schema(operation_id="RetrieveOrderItem", responses={200: OrderItemReadSerializer})
+    @extend_schema(
+        operation_id="RetrieveOrderItem", responses={200: OrderItemReadSerializer}
+    )
     def get(self, *args, **kwargs):
         return super().get(*args, **kwargs)

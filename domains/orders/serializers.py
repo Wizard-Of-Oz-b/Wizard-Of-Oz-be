@@ -1,8 +1,11 @@
 # domains/orders/serializers.py
 from __future__ import annotations
-from domains.orders.utils import parse_option_key_safe
+
 from rest_framework import serializers
-from .models import Purchase, OrderItem
+
+from domains.orders.utils import parse_option_key_safe
+
+from .models import OrderItem, Purchase
 
 
 class PurchaseReadSerializer(serializers.ModelSerializer):
@@ -11,35 +14,70 @@ class PurchaseReadSerializer(serializers.ModelSerializer):
     class Meta:
         model = Purchase
         fields = (
-            "purchase_id", "user", "product", "product_name",
-            "amount", "unit_price", "options", "option_key",
+            "purchase_id",
+            "user",
+            "product",
+            "product_name",
+            "amount",
+            "unit_price",
+            "options",
+            "option_key",
             "items_total",  # 상품 총액만 포함
-            "status", "purchased_at", "pg", "pg_tid",
+            "status",
+            "purchased_at",
+            "pg",
+            "pg_tid",
         )
         read_only_fields = ("purchase_id", "status", "purchased_at", "product_name")
 
 
 class PurchaseReadyReadSerializer(serializers.ModelSerializer):
     """결제 대기 주문 전용 시리얼라이저 - order_id 필드 추가"""
+
     product_name = serializers.CharField(source="product.name", read_only=True)
-    order_id = serializers.UUIDField(source="purchase_id", read_only=True)  # order_id 추가
+    order_id = serializers.UUIDField(
+        source="purchase_id", read_only=True
+    )  # order_id 추가
 
     class Meta:
         model = Purchase
         fields = (
-            "purchase_id", "order_id", "user", "product", "product_name",
-            "amount", "unit_price", "options", "option_key",
+            "purchase_id",
+            "order_id",
+            "user",
+            "product",
+            "product_name",
+            "amount",
+            "unit_price",
+            "options",
+            "option_key",
             "items_total",  # 상품 총액만 포함
-            "status", "purchased_at", "pg", "pg_tid",
+            "status",
+            "purchased_at",
+            "pg",
+            "pg_tid",
         )
-        read_only_fields = ("purchase_id", "order_id", "status", "purchased_at", "product_name")
+        read_only_fields = (
+            "purchase_id",
+            "order_id",
+            "status",
+            "purchased_at",
+            "product_name",
+        )
+
 
 class PurchaseWriteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Purchase
         fields = (
-            "user", "product", "amount", "unit_price",
-            "options", "option_key", "pg", "pg_tid",
+            "user",
+            "product",
+            "amount",
+            "unit_price",
+            "options",
+            "option_key",
+            "pg",
+            "pg_tid",
         )
 
     def validate_amount(self, v):
@@ -47,12 +85,16 @@ class PurchaseWriteSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("amount must be >= 1")
         return v
 
+
 # 호환용 별칭 (기존 코드에서 PurchaseSerializer를 임포트해도 동작)
 PurchaseSerializer = PurchaseReadSerializer
 
+
 class OrderItemReadSerializer(serializers.ModelSerializer):
     item_id = serializers.UUIDField(read_only=True)
-    product_id = serializers.UUIDField(read_only=True)  # FK의 *_id 속성은 자동 노출 가능
+    product_id = serializers.UUIDField(
+        read_only=True
+    )  # FK의 *_id 속성은 자동 노출 가능
     order_id = serializers.UUIDField(source="order.purchase_id", read_only=True)
     line_total = serializers.SerializerMethodField()
 
@@ -80,14 +122,26 @@ class OrderItemReadSerializer(serializers.ModelSerializer):
 
     def get_line_total(self, obj):
         # 모델 프로퍼티 있어도 직렬화에서 보장
-        return (obj.unit_price or 0) * (obj.quantity or 0) - (obj.line_discount or 0) + (obj.line_tax or 0)
+        return (
+            (obj.unit_price or 0) * (obj.quantity or 0)
+            - (obj.line_discount or 0)
+            + (obj.line_tax or 0)
+        )
+
+
 # domains/orders/serializers.py
 
 
 class OrderItemMiniSerializer(serializers.ModelSerializer):
     class Meta:
         model = OrderItem
-        fields = ["product", "quantity", "unit_price", "option_key"]  # 필드명 프로젝트에 맞게
+        fields = [
+            "product",
+            "quantity",
+            "unit_price",
+            "option_key",
+        ]  # 필드명 프로젝트에 맞게
+
 
 class PurchaseOutSerializer(serializers.Serializer):
     # 테스트가 기대하는 top-level id 제공

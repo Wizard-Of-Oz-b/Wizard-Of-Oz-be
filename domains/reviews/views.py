@@ -1,22 +1,23 @@
 # domains/reviews/views.py
 from django.db.models import Avg, Count
 from django.shortcuts import get_object_or_404
+
+from drf_spectacular.utils import OpenApiParameter, OpenApiTypes, extend_schema
 from rest_framework import generics, permissions
 from rest_framework.response import Response
-from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
 
 from domains.catalog.models import Product
 from domains.reviews.models import Review
 from domains.reviews.serializers import ReviewReadSerializer, ReviewWriteSerializer
-from shared.permissions import IsOwnerOrAdmin
 from shared.pagination import StandardResultsSetPagination
+from shared.permissions import IsOwnerOrAdmin
 
 
 @extend_schema(
     parameters=[
         OpenApiParameter(
             name="product_id",
-            type=OpenApiTypes.UUID,   # 👈 UUID
+            type=OpenApiTypes.UUID,  # 👈 UUID
             location=OpenApiParameter.PATH,
             description="상품 ID (UUID)",
             required=True,
@@ -28,6 +29,7 @@ class ProductReviewListCreateAPI(generics.ListCreateAPIView):
     GET  /api/v1/products/{product_id}/reviews
     POST /api/v1/products/{product_id}/reviews  (구매자만)
     """
+
     pagination_class = StandardResultsSetPagination
     queryset = Review.objects.none()
 
@@ -36,8 +38,7 @@ class ProductReviewListCreateAPI(generics.ListCreateAPIView):
         if getattr(self, "swagger_fake_view", False):
             return Review.objects.none()
         return (
-            Review.objects
-            .filter(product_id=self.kwargs.get("product_id"))
+            Review.objects.filter(product_id=self.kwargs.get("product_id"))
             .select_related("user")
             .order_by("-created_at")
         )
@@ -57,7 +58,11 @@ class ProductReviewListCreateAPI(generics.ListCreateAPIView):
         serializer.save()
 
     def get_serializer_class(self):
-        return ReviewWriteSerializer if self.request.method == "POST" else ReviewReadSerializer
+        return (
+            ReviewWriteSerializer
+            if self.request.method == "POST"
+            else ReviewReadSerializer
+        )
 
     def get_serializer_context(self):
         ctx = super().get_serializer_context()
@@ -129,19 +134,26 @@ class ReviewDetailAPI(generics.RetrieveUpdateDestroyAPIView):
     """
     GET/PATCH/DELETE /api/v1/reviews/{review_id}
     """
+
     lookup_url_kwarg = "review_id"
     queryset = Review.objects.all()
     permission_classes = [IsOwnerOrAdmin]
     http_method_names = ["get", "patch", "delete", "options", "head"]
 
     def get_serializer_class(self):
-        return ReviewWriteSerializer if self.request.method == "PATCH" else ReviewReadSerializer
+        return (
+            ReviewWriteSerializer
+            if self.request.method == "PATCH"
+            else ReviewReadSerializer
+        )
 
     @extend_schema(operation_id="GetReview", tags=["products"])
     def get(self, *a, **kw):
         return super().get(*a, **kw)
 
-    @extend_schema(operation_id="UpdateReview", request=ReviewWriteSerializer, tags=["products"])
+    @extend_schema(
+        operation_id="UpdateReview", request=ReviewWriteSerializer, tags=["products"]
+    )
     def patch(self, *a, **kw):
         return super().patch(*a, **kw)
 

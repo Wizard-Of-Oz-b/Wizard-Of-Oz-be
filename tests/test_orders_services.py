@@ -428,14 +428,14 @@ class TestCreateOrderItemsFromCart:
             status=Purchase.STATUS_READY
         )
         
-        # 장바구니가 없는 경우
-        count = create_order_items_from_cart(purchase)
-        assert count == 0
+        # 장바구니가 없는 경우 - 예외 발생 예상
+        with pytest.raises(EmptyCartError):
+            create_order_items_from_cart(purchase)
         
-        # 빈 장바구니인 경우
+        # 빈 장바구니인 경우 - 예외 발생 예상
         Cart.objects.create(user=user)
-        count = create_order_items_from_cart(purchase)
-        assert count == 0
+        with pytest.raises(EmptyCartError):
+            create_order_items_from_cart(purchase)
     
     def test_create_order_items_from_cart_insufficient_stock(self, user_factory, product_factory):
         """재고 부족 시 테스트"""

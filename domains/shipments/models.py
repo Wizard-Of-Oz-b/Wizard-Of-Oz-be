@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import uuid
+
 from django.conf import settings
 from django.db import models
 
@@ -51,9 +52,16 @@ class Shipment(models.Model):
 
     class Meta:
         indexes = [
-            models.Index(fields=["carrier", "tracking_number"], name="shipments_s_carrier_4f3ab4_idx"),
-            models.Index(fields=["user", "created_at"], name="shipments_s_user_id_a5db8b_idx"),
-            models.Index(fields=["status", "last_event_at"], name="shipments_s_status_576ef0_idx"),
+            models.Index(
+                fields=["carrier", "tracking_number"],
+                name="shipments_s_carrier_4f3ab4_idx",
+            ),
+            models.Index(
+                fields=["user", "created_at"], name="shipments_s_user_id_a5db8b_idx"
+            ),
+            models.Index(
+                fields=["status", "last_event_at"], name="shipments_s_status_576ef0_idx"
+            ),
         ]
         constraints = [
             models.UniqueConstraint(
@@ -85,8 +93,13 @@ class ShipmentEvent(models.Model):
 
     class Meta:
         indexes = [
-            models.Index(fields=["shipment", "occurred_at"], name="shipments_s_shipmen_0b12ad_idx"),
-            models.Index(fields=["shipment", "status"], name="shipments_s_shipmen_0c2d4c_idx"),
+            models.Index(
+                fields=["shipment", "occurred_at"],
+                name="shipments_s_shipmen_0b12ad_idx",
+            ),
+            models.Index(
+                fields=["shipment", "status"], name="shipments_s_shipmen_0c2d4c_idx"
+            ),
             models.Index(fields=["dedupe_key"], name="shipments_s_dedupe__a71a08_idx"),
         ]
 

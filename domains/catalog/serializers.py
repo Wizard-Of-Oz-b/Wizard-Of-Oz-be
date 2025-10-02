@@ -1,12 +1,16 @@
 # domains/catalog/serializers.py
 from __future__ import annotations
 
-from typing import Iterable, Optional, Any
+from typing import Any, Iterable, Optional
+
 from django.conf import settings
 from django.core.exceptions import FieldError
-from rest_framework import serializers
+
 from drf_spectacular.utils import extend_schema_field
+from rest_framework import serializers
+
 from .models import Category, Product, ProductStock
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 공용 유틸
@@ -72,6 +76,7 @@ class ProductImageSlim(serializers.Serializer):
     순수 Serializer로 슬림 구조만 내려준다.
     - 이미지 없으면 url=None (프론트가 안전하게 분기 가능)
     """
+
     id = serializers.CharField()
     url = serializers.CharField(allow_blank=True, allow_null=True)
 
@@ -114,13 +119,14 @@ class ProductReadSerializer(serializers.ModelSerializer):
             "price",
             "is_active",
             "options",
-            "category_id",    # 읽기 전용 FK id
+            "category_id",  # 읽기 전용 FK id
             "category_name",  # 읽기 전용 FK name
             "primary_image",  # 대표 이미지(유효 url)
-            "images",         # 모든 이미지(슬림)
+            "images",  # 모든 이미지(슬림)
             "created_at",
             "updated_at",
         )
+
     # read_only_fields는 fields로 충분하니 생략해도 무방(남겨도 OK)
 
     # --- 이미지 헬퍼 ---
@@ -244,8 +250,10 @@ class ProductStockReadSerializer(serializers.ModelSerializer):
 
 class ProductStockWriteSerializer(serializers.ModelSerializer):
     product_id = serializers.UUIDField()  # 입력은 product_id로 받기
-    option_key = serializers.CharField(required=False, allow_blank=True, allow_null=True, default="")
-    options    = serializers.JSONField(required=False, default=dict)
+    option_key = serializers.CharField(
+        required=False, allow_blank=True, allow_null=True, default=""
+    )
+    options = serializers.JSONField(required=False, default=dict)
 
     class Meta:
         model = ProductStock

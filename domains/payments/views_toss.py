@@ -17,6 +17,8 @@ from .toss_client import confirm as toss_confirm, retrieve_by_key, cancel as tos
 from domains.orders.models import PurchaseStatus  # 주문 헤더 상태 동기화용
 
 from domains.carts.models import CartItem
+from domains.orders.services import create_order_items_from_cart, validate_cart_stock   # ← 추가
+from domains.catalog.services import OutOfStockError, StockRowMissing  # ← 추가
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -58,7 +60,13 @@ class TossConfirmAPI(views.APIView):
                     status=400,
                 )
 
-        # 4) Toss confirm 호출 (재고 검증은 checkout 단계에서 이미 완료)
+        # ✅ 4) 재고 사전 검증 (토스 결제 전)
+        try:
+            validate_cart_stock(payment.order.user)
+        except (OutOfStockError, StockRowMissing) as e:
+            return Response({"detail": str(e)}, status=409)
+
+        # 5) Toss confirm 호출 (트랜잭션 밖에서 처리)
         data = toss_confirm(payment_key, order_id, amount)
 
         # 6) Payment 상태/스냅샷 반영 (트랜잭션 밖에서 처리)
@@ -77,26 +85,27 @@ class TossConfirmAPI(views.APIView):
             payment.touch()
             payment.save()
         
-        # ✅ 7) OrderItem은 이미 체크아웃에서 생성됨 (confirm에서는 장바구니 확인 안함)
+        # ✅ 7) 승인 성공 시점에 OrderItem 생성 (별도 트랜잭션)
         if provider_done:
-            # OrderItem이 없으면 체크아웃 과정에서 문제가 있었던 것
-            from domains.orders.models import OrderItem
-            if not OrderItem.objects.filter(order=payment.order).exists():
-                # 🚨 체크아웃 과정에서 OrderItem이 생성되지 않았음
-                # 토스 결제 취소 시도
+            try:
+                with transaction.atomic():
+                    created = create_order_items_from_cart(payment.order)
+            except ValidationError as e:
+                # 🚨 스냅샷 불일치 시 토스 결제 취소 시도
                 try:
-                    toss_cancel(data.get("paymentKey"), "주문 정보 누락으로 인한 결제 취소")
+                    toss_cancel(data.get("paymentKey"), "재고 부족으로 인한 주문 생성 실패")
                 except Exception as cancel_error:
+                    # 토스 취소 실패 시 로그 기록 (운영팀 수동 처리 필요)
                     import logging
                     logger = logging.getLogger(__name__)
                     logger.error(f"토스 결제 취소 실패: {cancel_error}, Payment ID: {payment.id}")
                 
-                # Payment 상태를 READY로 롤백
+                # ✅ Payment 상태를 READY로 롤백 (별도 트랜잭션으로 안전하게 처리)
                 with transaction.atomic():
                     payment.status = PaymentStatus.READY
                     payment.save(update_fields=["status"])
                 
-                return Response({"detail": "주문 정보가 누락되었습니다. 다시 주문해주세요."}, status=500)
+                return Response({"detail": f"주문 생성 실패: {str(e)}"}, status=500)
 
         # 8) 이벤트 로그 (별도 트랜잭션)
         with transaction.atomic():
@@ -119,7 +128,8 @@ class TossConfirmAPI(views.APIView):
                 order.status = PurchaseStatus.PAID
                 order.save(update_fields=["status"])
 
-                # ✅ 장바구니 비우기는 checkout에서 이미 처리됨
+                # ✅ 결제 성공 시 장바구니 비우기 (OrderItem 생성 시 이미 처리되지만 안전장치)
+                CartItem.objects.filter(cart__user=order.user).delete()
 
         return Response(PaymentReadSerializer(payment).data, status=status.HTTP_200_OK)
 

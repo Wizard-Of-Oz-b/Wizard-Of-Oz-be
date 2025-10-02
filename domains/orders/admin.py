@@ -1,6 +1,7 @@
 # domains/orders/admin.py
 from django.contrib import admin
-from .models import Purchase, OrderItem
+
+from .models import OrderItem, Purchase
 
 
 @admin.register(Purchase)

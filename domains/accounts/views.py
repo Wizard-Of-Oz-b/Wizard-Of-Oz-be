@@ -1,29 +1,28 @@
 # domains/accounts/views.py
-from django.contrib.auth import get_user_model
 from django.conf import settings
+from django.contrib.auth import get_user_model
 
 import django_filters as df
 from django_filters.rest_framework import DjangoFilterBackend
-
-from rest_framework import generics, permissions, status, filters, serializers
+from drf_spectacular.utils import OpenApiExample, OpenApiResponse, extend_schema
+from rest_framework import filters, generics, permissions, serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
+from shared.api_markers import EmptySerializer
 
 from .models import SocialAccount
-from .utils import refresh_cookie_kwargs
 from .serializers import (
-    RegisterSerializer,
-    LoginSerializer,
     LoginRequestSerializer,
-    TokenPairResponseSerializer,
+    LoginSerializer,
     MeSerializer,
     MeUpdateSerializer,
+    RegisterSerializer,
     SocialAccountSerializer,
+    TokenPairResponseSerializer,
 )
-from shared.api_markers import EmptySerializer
+from .utils import refresh_cookie_kwargs
 
 User = get_user_model()
 
@@ -53,8 +52,12 @@ class LoginView(APIView):
         refresh = RefreshToken.for_user(user)
         access = str(refresh.access_token)
 
-        resp = Response({"access": access, "refresh": str(refresh)}, status=status.HTTP_200_OK)
-        resp.set_cookie("refresh", str(refresh), **refresh_cookie_kwargs(settings.DEBUG))
+        resp = Response(
+            {"access": access, "refresh": str(refresh)}, status=status.HTTP_200_OK
+        )
+        resp.set_cookie(
+            "refresh", str(refresh), **refresh_cookie_kwargs(settings.DEBUG)
+        )
         return resp
 
 
@@ -112,6 +115,7 @@ class MeView(generics.RetrieveUpdateDestroyAPIView):
     PATCH  /api/v1/users/me/      이름/닉네임/전화/주소 수정 & (옵션) 비밀번호 변경
     DELETE /api/v1/users/me/      소프트 삭제(status=deleted, is_active=False)
     """
+
     permission_classes = [permissions.IsAuthenticated]
     http_method_names = ["get", "patch", "delete", "head", "options"]
 
@@ -125,7 +129,11 @@ class MeView(generics.RetrieveUpdateDestroyAPIView):
     def get(self, *args, **kwargs):
         return super().get(*args, **kwargs)
 
-    @extend_schema(operation_id="UpdateMe", request=MeUpdateSerializer, responses={200: MeSerializer})
+    @extend_schema(
+        operation_id="UpdateMe",
+        request=MeUpdateSerializer,
+        responses={200: MeSerializer},
+    )
     def patch(self, request, *args, **kwargs):
         kwargs["partial"] = True
         return super().patch(request, *args, **kwargs)
@@ -148,18 +156,22 @@ class MySocialAccountListAPI(generics.ListAPIView):
     """
     GET /api/v1/users/me/social-accounts/
     """
+
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = SocialAccountSerializer
     queryset = SocialAccount.objects.none()
 
     def get_queryset(self):
-        return SocialAccount.objects.filter(user=self.request.user).order_by("provider", "created_at")
+        return SocialAccount.objects.filter(user=self.request.user).order_by(
+            "provider", "created_at"
+        )
 
 
 class MySocialAccountDeleteAPI(generics.DestroyAPIView):
     """
     DELETE /api/v1/users/me/social-accounts/{social_id}/
     """
+
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = SocialAccountSerializer
     lookup_url_kwarg = "social_id"
@@ -187,10 +199,15 @@ class UserListAdminAPI(generics.ListAPIView):
     GET /api/v1/users/   (Admin)
       - ?email=, ?nickname=, ?status=, ?created_from=, ?created_to=
     """
+
     permission_classes = [permissions.IsAdminUser]  # is_staff=True(=admin)만 접근
     queryset = User.objects.all().order_by("-created_at")
     serializer_class = MeSerializer
-    filter_backends = [DjangoFilterBackend, filters.OrderingFilter, filters.SearchFilter]
+    filter_backends = [
+        DjangoFilterBackend,
+        filters.OrderingFilter,
+        filters.SearchFilter,
+    ]
     filterset_class = UserFilter
     search_fields = ["email", "nickname"]
     ordering_fields = ["created_at", "email"]
@@ -200,11 +217,8 @@ class UserDetailAdminAPI(generics.RetrieveAPIView):
     """
     GET /api/v1/users/{user_id}  (Admin)
     """
+
     permission_classes = [permissions.IsAdminUser]
     queryset = User.objects.all()
     serializer_class = MeSerializer
     lookup_url_kwarg = "user_id"
-
-
-
-

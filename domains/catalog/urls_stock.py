@@ -1,5 +1,6 @@
 # domains/catalog/urls_stock.py
 from rest_framework.routers import SimpleRouter
+
 from .views_stock import ProductStockViewSet
 
 router = SimpleRouter()

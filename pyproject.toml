@@ -32,4 +32,98 @@ dev = [
   "pytest-cov>=7.0.0",
   "pytest-django>=4.11.1",
   "pytest-xdist>=3.8.0",
+  # Code quality tools
+  "black>=24.0.0",
+  "isort>=5.13.0",
+  "flake8>=7.0.0",
+  "bandit>=1.7.0",
+  "pre-commit>=3.6.0",
+  # Type checking
+  "mypy>=1.8.0",
+  "django-stubs>=4.2.0",
+  "djangorestframework-stubs>=3.14.0",
+  "types-requests>=2.31.0",
 ]
+
+[tool.black]
+line-length = 88
+target-version = ['py313']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+  | migrations
+)/
+'''
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+known_django = "django"
+known_first_party = ["domains", "config", "shared", "api"]
+sections = ["FUTURE", "STDLIB", "DJANGO", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
+skip_glob = ["*/migrations/*"]
+
+[tool.flake8]
+max-line-length = 88
+extend-ignore = ["E203", "W503", "E501"]
+exclude = [
+    ".git",
+    "__pycache__",
+    "*/migrations/*",
+    ".venv",
+    "build",
+    "dist"
+]
+
+[tool.bandit]
+exclude_dirs = ["tests", "*/migrations/*"]
+skips = ["B101", "B601"]
+
+[tool.mypy]
+python_version = "3.13"
+check_untyped_defs = true
+disallow_untyped_defs = false  # 점진적 적용을 위해 처음엔 false
+warn_return_any = true
+warn_unused_configs = true
+no_implicit_reexport = true
+strict_optional = true
+plugins = ["mypy_django_plugin.main"]
+
+# 제외할 디렉토리들
+exclude = [
+    "migrations/",
+    "venv/",
+    ".venv/",
+    "build/",
+    "dist/",
+]
+
+# Django 설정
+[tool.django-stubs]
+django_settings_module = "config.settings"
+
+# 모듈별 설정 (점진적 적용)
+[[tool.mypy.overrides]]
+module = [
+    "domains.*.migrations.*",
+    "tests.*",
+]
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = [
+    "celery.*",
+    "requests.*",
+    "PIL.*",
+]
+ignore_missing_imports = true

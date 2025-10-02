@@ -1,34 +1,54 @@
-from drf_spectacular.utils import extend_schema, OpenApiExample
-from rest_framework import mixins, viewsets, permissions, filters
-from django_filters.rest_framework import DjangoFilterBackend
-from domains.wishlists.models import WishlistItem
-from .serializers import WishlistItemReadSerializer, WishlistItemWriteSerializer
 from django.db import transaction
+
+from django_filters.rest_framework import DjangoFilterBackend
+from drf_spectacular.utils import OpenApiExample, extend_schema
+from rest_framework import filters, mixins, permissions, status, viewsets
 from rest_framework.decorators import action
-from rest_framework import status
 from rest_framework.response import Response
 
 # carts 쪽 의존
 from domains.carts.models import CartItem
-from domains.carts.services import get_or_create_user_cart
 from domains.carts.serializers import CartItemSerializer  # 이미 있는 시리얼라이저
-from .serializers import MoveToCartRequestSerializer
+from domains.carts.services import get_or_create_user_cart
+from domains.wishlists.models import WishlistItem
 
-class MyWishlistViewSet(mixins.ListModelMixin, mixins.CreateModelMixin, mixins.DestroyModelMixin, viewsets.GenericViewSet):
+from .serializers import (
+    MoveToCartRequestSerializer,
+    WishlistItemReadSerializer,
+    WishlistItemWriteSerializer,
+)
+
+
+class MyWishlistViewSet(
+    mixins.ListModelMixin,
+    mixins.CreateModelMixin,
+    mixins.DestroyModelMixin,
+    viewsets.GenericViewSet,
+):
     permission_classes = [permissions.IsAuthenticated]
-    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    search_fields   = ["product__name", "product__description"]
+    filter_backends = [
+        DjangoFilterBackend,
+        filters.SearchFilter,
+        filters.OrderingFilter,
+    ]
+    search_fields = ["product__name", "product__description"]
     ordering_fields = ["created_at", "product__price"]
 
     def get_queryset(self):
-        return (WishlistItem.objects
-                .filter(user=self.request.user)
-                .select_related("product")
-                .prefetch_related("product__images")
-                .order_by("-created_at"))
+        return (
+            WishlistItem.objects.filter(user=self.request.user)
+            .select_related("product")
+            .prefetch_related("product__images")
+            .order_by("-created_at")
+        )
 
     def get_serializer_class(self):
-        return WishlistItemWriteSerializer if self.action == "create" else WishlistItemReadSerializer
+        return (
+            WishlistItemWriteSerializer
+            if self.action == "create"
+            else WishlistItemReadSerializer
+        )
+
     @extend_schema(
         request=MoveToCartRequestSerializer,
         responses=CartItemSerializer,
@@ -75,7 +95,9 @@ class MyWishlistViewSet(mixins.ListModelMixin, mixins.CreateModelMixin, mixins.D
             # ★ 혹시 과거 데이터가 unit_price=None이면 채워두기
             if getattr(cart_item, "unit_price", None) is None:
                 cart_item.unit_price = product_price
-            cart_item.save(update_fields=["quantity", "options", "unit_price", "updated_at"])
+            cart_item.save(
+                update_fields=["quantity", "options", "unit_price", "updated_at"]
+            )
 
         if do_remove:
             item.delete()
