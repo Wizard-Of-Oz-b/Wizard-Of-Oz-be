@@ -1,19 +1,17 @@
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
+
 import django_filters as df
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import permissions, generics
+from drf_spectacular.utils import OpenApiParameter, OpenApiTypes, extend_schema
+from rest_framework import generics, permissions
 from rest_framework.filters import OrderingFilter
 from rest_framework.response import Response
-from drf_spectacular.utils import (
-    extend_schema, OpenApiParameter, OpenApiTypes
-)
+
+from shared.pagination import StandardResultsSetPagination
 
 from .models import Product
-from .serializers import (
-    ProductReadSerializer, ProductWriteSerializer, ProductImageSlim
-)
-from shared.pagination import StandardResultsSetPagination
+from .serializers import ProductImageSlim, ProductReadSerializer, ProductWriteSerializer
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -89,10 +87,18 @@ class ProductListCreateAPI(generics.ListCreateAPIView):
 
     def get_permissions(self):
         # 목록은 공개, 생성은 관리자
-        return [permissions.IsAdminUser()] if self.request.method == "POST" else [permissions.AllowAny()]
+        return (
+            [permissions.IsAdminUser()]
+            if self.request.method == "POST"
+            else [permissions.AllowAny()]
+        )
 
     def get_serializer_class(self):
-        return ProductWriteSerializer if self.request.method == "POST" else ProductReadSerializer
+        return (
+            ProductWriteSerializer
+            if self.request.method == "POST"
+            else ProductReadSerializer
+        )
 
     # 절대 URL 생성을 위해 request 전달
     def get_serializer_context(self):
@@ -103,11 +109,25 @@ class ProductListCreateAPI(generics.ListCreateAPIView):
     @extend_schema(
         operation_id="ListProducts",
         parameters=[
-            OpenApiParameter("q", OpenApiTypes.STR, OpenApiParameter.QUERY, required=False, description="이름/설명 검색"),
-            OpenApiParameter("min_price", OpenApiTypes.NUMBER, OpenApiParameter.QUERY, required=False),
-            OpenApiParameter("max_price", OpenApiTypes.NUMBER, OpenApiParameter.QUERY, required=False),
-            OpenApiParameter("category_id", OpenApiTypes.UUID, OpenApiParameter.QUERY, required=False),
-            OpenApiParameter("is_active", OpenApiTypes.BOOL, OpenApiParameter.QUERY, required=False),
+            OpenApiParameter(
+                "q",
+                OpenApiTypes.STR,
+                OpenApiParameter.QUERY,
+                required=False,
+                description="이름/설명 검색",
+            ),
+            OpenApiParameter(
+                "min_price", OpenApiTypes.NUMBER, OpenApiParameter.QUERY, required=False
+            ),
+            OpenApiParameter(
+                "max_price", OpenApiTypes.NUMBER, OpenApiParameter.QUERY, required=False
+            ),
+            OpenApiParameter(
+                "category_id", OpenApiTypes.UUID, OpenApiParameter.QUERY, required=False
+            ),
+            OpenApiParameter(
+                "is_active", OpenApiTypes.BOOL, OpenApiParameter.QUERY, required=False
+            ),
             OpenApiParameter(
                 "ordering",
                 OpenApiTypes.STR,
@@ -121,7 +141,11 @@ class ProductListCreateAPI(generics.ListCreateAPIView):
     def get(self, *args, **kwargs):
         return super().get(*args, **kwargs)
 
-    @extend_schema(operation_id="CreateProduct", request=ProductWriteSerializer, responses={201: ProductReadSerializer})
+    @extend_schema(
+        operation_id="CreateProduct",
+        request=ProductWriteSerializer,
+        responses={201: ProductReadSerializer},
+    )
     def post(self, *args, **kwargs):
         return super().post(*args, **kwargs)
 
@@ -143,21 +167,35 @@ class ProductDetailAPI(generics.RetrieveUpdateDestroyAPIView):
 
     def get_permissions(self):
         # 열람은 모두 허용, 수정/삭제는 관리자만
-        return [permissions.IsAdminUser()] if self.request.method in ("PATCH", "DELETE") else [permissions.AllowAny()]
+        return (
+            [permissions.IsAdminUser()]
+            if self.request.method in ("PATCH", "DELETE")
+            else [permissions.AllowAny()]
+        )
 
     def get_serializer_class(self):
-        return ProductWriteSerializer if self.request.method in ("PATCH", "PUT") else ProductReadSerializer
+        return (
+            ProductWriteSerializer
+            if self.request.method in ("PATCH", "PUT")
+            else ProductReadSerializer
+        )
 
     def get_serializer_context(self):
         ctx = super().get_serializer_context()
         ctx["request"] = self.request
         return ctx
 
-    @extend_schema(operation_id="RetrieveProduct", responses={200: ProductReadSerializer})
+    @extend_schema(
+        operation_id="RetrieveProduct", responses={200: ProductReadSerializer}
+    )
     def get(self, *args, **kwargs):
         return super().get(*args, **kwargs)
 
-    @extend_schema(operation_id="UpdateProduct", request=ProductWriteSerializer, responses={200: ProductReadSerializer})
+    @extend_schema(
+        operation_id="UpdateProduct",
+        request=ProductWriteSerializer,
+        responses={200: ProductReadSerializer},
+    )
     def patch(self, *args, **kwargs):
         return super().patch(*args, **kwargs)
 
@@ -174,10 +212,13 @@ class ProductImagesAPI(generics.GenericAPIView):
     상품의 이미지 리스트를 공개로 반환.
     응답: ProductImageSlim[]
     """
+
     permission_classes = [permissions.AllowAny]
     lookup_url_kwarg = "product_id"  # urls에서 <uuid:product_id>와 매칭
 
-    @extend_schema(operation_id="ListProductImages", responses=ProductImageSlim(many=True))
+    @extend_schema(
+        operation_id="ListProductImages", responses=ProductImageSlim(many=True)
+    )
     def get(self, request, *args, **kwargs):
         product = get_object_or_404(Product, pk=kwargs.get(self.lookup_url_kwarg))
         acc = _image_accessor_for_product()

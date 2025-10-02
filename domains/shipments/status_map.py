@@ -1,7 +1,11 @@
 from typing import Literal
 
 
-def map_provider_status(provider_status: str) -> Literal["pending", "in_transit", "out_for_delivery", "delivered", "exception", "canceled"]:
+def map_provider_status(
+    provider_status: str,
+) -> Literal[
+    "pending", "in_transit", "out_for_delivery", "delivered", "exception", "canceled"
+]:
     s = (provider_status or "").lower()
     if s in {"info_received", "accepted", "ready"}:
         return "pending"

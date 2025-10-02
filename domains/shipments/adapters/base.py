@@ -1,12 +1,15 @@
 # domains/shipments/adapters/base.py
 from typing import Any, Dict, List
 
+
 class CarrierAdapter:
     """
     각 택배사 어댑터의 최소 공통 인터페이스
     """
 
-    def register_tracking(self, *, tracking_number: str, carrier: str, fid: str) -> None:
+    def register_tracking(
+        self, *, tracking_number: str, carrier: str, fid: str
+    ) -> None:
         """
         (옵션) 외부 서비스에 트래킹 번호를 등록해야 할 때 사용.
         기본 구현은 no-op.

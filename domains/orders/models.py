@@ -2,18 +2,21 @@ from __future__ import annotations
 
 import uuid
 from decimal import Decimal
-from django.db import models
+
 from django.contrib.auth import get_user_model
+from django.db import models
+
 from domains.catalog.models import Product
 
 User = get_user_model()
 
 
 class PurchaseStatus(models.TextChoices):
-    READY = "ready", "Ready"          # ✅ 결제 전(헤더 생성 시)
+    READY = "ready", "Ready"  # ✅ 결제 전(헤더 생성 시)
     PAID = "paid", "Paid"
     CANCELED = "canceled", "Canceled"
     REFUNDED = "refunded", "Refunded"
+    MERGED = "merged", "Merged"  # ✅ 다른 주문으로 통합됨
 
 
 class Purchase(models.Model):
@@ -22,11 +25,13 @@ class Purchase(models.Model):
     STATUS_PAID = "paid"
     STATUS_CANCELED = "canceled"
     STATUS_REFUNDED = "refunded"
+    STATUS_MERGED = "merged"
     STATUS_CHOICES = [
         (STATUS_READY, "Ready"),
         (STATUS_PAID, "Paid"),
         (STATUS_CANCELED, "Canceled"),
         (STATUS_REFUNDED, "Refunded"),
+        (STATUS_MERGED, "Merged"),
     ]
 
     # --- PK ---
@@ -54,26 +59,32 @@ class Purchase(models.Model):
     # --- 주문 스냅샷/수량 (라인 전용; 헤더는 기본값 사용) ---
     # 헤더에서도 유효하도록 기본값/제약을 완화(>=0)
     amount = models.PositiveIntegerField(default=0)
-    unit_price = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    unit_price = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0.00")
+    )
     options = models.JSONField(default=dict, blank=True)
     option_key = models.CharField(max_length=64, blank=True, default="", db_index=True)
 
     # --- 헤더 합계(지금 추가한 필드) ---
-    items_total = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
-    grand_total = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    items_total = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0.00")
+    )
+    grand_total = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0.00")
+    )
 
     # --- 배송지 스냅샷 (주문 시점 복사본; 이후 주소 변경이 과거 주문에 영향 X) ---
     shipping_recipient = models.CharField(max_length=50, blank=True, default="")
-    shipping_phone     = models.CharField(max_length=20, blank=True, default="")
-    shipping_postcode  = models.CharField(max_length=10, blank=True, default="")
-    shipping_address1  = models.CharField(max_length=200, blank=True, default="")
-    shipping_address2  = models.CharField(max_length=200, blank=True, default="")
-    shipping_memo      = models.CharField(max_length=200, blank=True, default="")
+    shipping_phone = models.CharField(max_length=20, blank=True, default="")
+    shipping_postcode = models.CharField(max_length=10, blank=True, default="")
+    shipping_address1 = models.CharField(max_length=200, blank=True, default="")
+    shipping_address2 = models.CharField(max_length=200, blank=True, default="")
+    shipping_memo = models.CharField(max_length=200, blank=True, default="")
 
     status = models.CharField(
         max_length=20,
         choices=PurchaseStatus.choices,
-        default=PurchaseStatus.PAID,      # 기존 기본값 유지; 헤더 생성 시 코드에서 ready로 지정
+        default=PurchaseStatus.PAID,  # 기존 기본값 유지; 헤더 생성 시 코드에서 ready로 지정
     )
     purchased_at = models.DateTimeField(auto_now_add=True)
 
@@ -108,11 +119,26 @@ class Purchase(models.Model):
 
 
 class OrderItem(models.Model):
-    item_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, db_column="item_id")
-    order = models.ForeignKey(Purchase, on_delete=models.CASCADE, related_name="items", db_column="order_id")
-    product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name="order_items", db_column="product_id")
-    stock = models.ForeignKey("catalog.ProductStock", on_delete=models.PROTECT,
-                              null=True, blank=True, related_name="order_items", db_column="stock_id")
+    item_id = models.UUIDField(
+        primary_key=True, default=uuid.uuid4, editable=False, db_column="item_id"
+    )
+    order = models.ForeignKey(
+        Purchase, on_delete=models.CASCADE, related_name="items", db_column="order_id"
+    )
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.PROTECT,
+        related_name="order_items",
+        db_column="product_id",
+    )
+    stock = models.ForeignKey(
+        "catalog.ProductStock",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="order_items",
+        db_column="stock_id",
+    )
 
     # 스냅샷(표시/CS)
     product_name = models.CharField(max_length=80)
@@ -140,10 +166,15 @@ class OrderItem(models.Model):
             models.Index(fields=["sku"]),
         ]
         constraints = [
-            models.CheckConstraint(check=models.Q(quantity__gte=1), name="ck_orderitem_qty_ge_1"),
+            models.CheckConstraint(
+                check=models.Q(quantity__gte=1), name="ck_orderitem_qty_ge_1"
+            ),
         ]
 
     @property
     def line_total(self):
-        return (self.unit_price or 0) * (self.quantity or 0) - (self.line_discount or 0) + (self.line_tax or 0)
-
+        return (
+            (self.unit_price or 0) * (self.quantity or 0)
+            - (self.line_discount or 0)
+            + (self.line_tax or 0)
+        )

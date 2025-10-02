@@ -1,11 +1,13 @@
+from django.shortcuts import get_object_or_404
+
 from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from django.shortcuts import get_object_or_404
 
 from .models import User
-from .serializers import UserMeSerializer
 from .permissions import IsSelf
+from .serializers import UserMeSerializer
+
 
 # 1) /api/v1/users/  -> 본인만 1건 리스트로 반환 (Swagger에 기존 경로 유지용)
 class UserSelfOnlyListAPI(generics.ListAPIView):
@@ -14,6 +16,7 @@ class UserSelfOnlyListAPI(generics.ListAPIView):
 
     def get_queryset(self):
         return User.objects.filter(pk=self.request.user.pk)
+
 
 # 2) /api/v1/users/{user_id}/ -> 경로에 id가 있어도 "본인 것"만 허용
 class UserSelfOnlyRetrieveAPI(generics.RetrieveAPIView):
@@ -27,6 +30,7 @@ class UserSelfOnlyRetrieveAPI(generics.RetrieveAPIView):
         obj = get_object_or_404(User, pk=self.kwargs["pk"])
         self.check_object_permissions(self.request, obj)
         return obj
+
 
 # 3) /api/v1/users/me/ (GET/PATCH/DELETE)
 class UserMeAPI(generics.RetrieveUpdateDestroyAPIView):

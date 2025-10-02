@@ -20,7 +20,13 @@ class ShipmentEventInline(admin.TabularInline):
     model = models.ShipmentEvent
     extra = 0
     can_delete = False
-    readonly_fields = ("occurred_at", "status", "location", "description", "provider_code")
+    readonly_fields = (
+        "occurred_at",
+        "status",
+        "location",
+        "description",
+        "provider_code",
+    )
 
     def occurred_at(self, obj):
         return pick_attr(obj, "occurred_at", "time_sweet", "time_trans", "created_at")
@@ -71,8 +77,7 @@ class ShipmentAdmin(admin.ModelAdmin):
         def lookups(self, request, model_admin):
             # 동적 결정 대신 DB 실필드인 'carrier'만 사용
             qs = (
-                models.Shipment.objects
-                .order_by()
+                models.Shipment.objects.order_by()
                 .values_list("carrier", flat=True)
                 .distinct()[:50]
             )
@@ -95,16 +100,20 @@ class ShipmentAdmin(admin.ModelAdmin):
             if getattr(field, "choices", None):
                 return list(field.choices)
             qs = (
-                models.Shipment.objects
-                .order_by()
+                models.Shipment.objects.order_by()
                 .values_list(field_name, flat=True)
                 .distinct()[:50]
             )
             return [(v, v) for v in qs if v]
 
         def queryset(self, request, queryset):
-            field_names = {f.name for f in queryset.model._meta.get_fields() if hasattr(f, "name")}
-            field_name = next((n for n in ("status", "state", "delivery_status") if n in field_names), None)
+            field_names = {
+                f.name for f in queryset.model._meta.get_fields() if hasattr(f, "name")
+            }
+            field_name = next(
+                (n for n in ("status", "state", "delivery_status") if n in field_names),
+                None,
+            )
             if field_name and self.value():
                 return queryset.filter(**{field_name: self.value()})
             return queryset
@@ -130,14 +139,21 @@ class ShipmentAdmin(admin.ModelAdmin):
 
     @property
     def _last_event_field_name(self):
-        for name in ("last_event_at", "last_status_at", "latest_event_at", "updated_at"):
+        for name in (
+            "last_event_at",
+            "last_status_at",
+            "latest_event_at",
+            "updated_at",
+        ):
             if name in self._field_names:
                 return name
         return None
 
     @property
     def _field_names(self):
-        return {f.name for f in models.Shipment._meta.get_fields() if hasattr(f, "name")}
+        return {
+            f.name for f in models.Shipment._meta.get_fields() if hasattr(f, "name")
+        }
 
     # ----- list_display / readonly_fields용 콜러블 -----
     def user_display(self, obj):
@@ -145,6 +161,7 @@ class ShipmentAdmin(admin.ModelAdmin):
         if not u:
             return "-"
         return getattr(u, "email", None) or getattr(u, "username", None) or str(u)
+
     user_display.short_description = "User"
 
     def carrier_display(self, obj):
@@ -156,7 +173,10 @@ class ShipmentAdmin(admin.ModelAdmin):
         return value or "-"
 
     def invoice_no_display(self, obj):
-        return pick_attr(obj, "invoice_no", "tracking_number", "waybill_no", default="-")
+        return pick_attr(
+            obj, "invoice_no", "tracking_number", "waybill_no", default="-"
+        )
+
     invoice_no_display.short_description = "Invoice/Tracking"
 
     def status_display(self, obj):
@@ -181,7 +201,14 @@ class ShipmentAdmin(admin.ModelAdmin):
 # ---------- ShipmentEvent Admin ----------
 @admin.register(models.ShipmentEvent)
 class ShipmentEventAdmin(admin.ModelAdmin):
-    list_display = ("id", "occurred_at", "status", "location", "description", "provider_code")
+    list_display = (
+        "id",
+        "occurred_at",
+        "status",
+        "location",
+        "description",
+        "provider_code",
+    )
     readonly_fields = ("raw_payload",)
     ordering = ("-id",)
     search_fields = ("description", "provider_code")

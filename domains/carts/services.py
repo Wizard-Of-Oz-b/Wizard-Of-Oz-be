@@ -1,15 +1,19 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Dict, Tuple, Any
+from typing import Any, Dict, Optional, Tuple
 from urllib.parse import urlencode
 
+from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
 
-from .models import Cart, CartItem
 from domains.catalog.models import Product
 from domains.orders.utils import parse_option_key_safe
+
+from .models import Cart, CartItem
+
+User = get_user_model()
 
 
 def make_option_key(options: Dict[str, Any] | None) -> str:
@@ -26,7 +30,7 @@ def make_option_key(options: Dict[str, Any] | None) -> str:
 
 
 @transaction.atomic
-def get_or_create_user_cart(user) -> Cart:
+def get_or_create_user_cart(user: Any) -> Cart:
     """유저의 카트를 잠금(select_for_update)으로 확보하거나 생성."""
     cart, _ = Cart.objects.select_for_update().get_or_create(user=user)
     # 만료 처리(선택): 만료됐으면 새로 생성
@@ -39,7 +43,7 @@ def get_or_create_user_cart(user) -> Cart:
 @transaction.atomic
 def add_or_update_item(
     *,
-    user,
+    user: Any,
     product: Product,
     options: Dict[str, Any] | str | None,
     quantity: int = 1,

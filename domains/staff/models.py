@@ -1,17 +1,24 @@
 from django.conf import settings
 from django.db import models
+
 from domains.accounts.models import UserRole
+
 
 class AdminRole(models.TextChoices):
     SUPER = "super", "Super"
     MANAGER = "manager", "Manager"
     CS = "cs", "CS"
 
+
 class Admin(models.Model):
     user = models.OneToOneField(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="staff_admin",
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="staff_admin",
     )
-    role = models.CharField(max_length=20, choices=UserRole.choices, default=UserRole.MANAGER)
+    role = models.CharField(
+        max_length=20, choices=UserRole.choices, default=UserRole.MANAGER
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -22,15 +29,18 @@ class Admin(models.Model):
     def __str__(self):
         return f"{self.user_id}:{self.role}"
 
+
 class AdminAction(models.TextChoices):
     CREATE = "CREATE", "CREATE"
     UPDATE = "UPDATE", "UPDATE"
     DELETE = "DELETE", "DELETE"
-    LOGIN  = "LOGIN",  "LOGIN"
+    LOGIN = "LOGIN", "LOGIN"
+
 
 class AdminLog(models.Model):
-    admin = models.ForeignKey("Admin", null=True, blank=True,
-                              on_delete=models.SET_NULL, related_name="logs")
+    admin = models.ForeignKey(
+        "Admin", null=True, blank=True, on_delete=models.SET_NULL, related_name="logs"
+    )
     action = models.CharField(max_length=20, choices=AdminAction.choices)
     target_table = models.CharField(max_length=50)
     target_id = models.IntegerField(null=True, blank=True)

@@ -1,254 +1,176 @@
-from django.conf import settings
-from django.http import HttpResponseRedirect
+# domains/accounts/views_social.py  (DROP-IN 교체본)
+
 from urllib.parse import urlencode
 
-from rest_framework import generics, permissions, status, renderers, serializers
+from django.conf import settings
+from django.http import HttpResponseRedirect
+
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiParameter, extend_schema
+from rest_framework import generics, permissions, status
 from rest_framework.response import Response
-from drf_spectacular.utils import extend_schema, OpenApiParameter
 
-# 추가 import
-import requests
-from django.contrib.auth import get_user_model
-from rest_framework_simplejwt.tokens import RefreshToken
-
+from .social import SocialAuthError, _provider_config, generate_authorize_url
 from .utils import refresh_cookie_kwargs
-from .social import generate_authorize_url, _provider_config, SocialAuthError
-
-User = get_user_model()
 
 
-# ----- Serializer for POST /social/{provider}/login/ -----
-class SocialLoginSerializer(serializers.Serializer):
-    code = serializers.CharField()
-    state = serializers.CharField(required=False, allow_blank=True)
-    redirect_uri = serializers.CharField(required=False, allow_blank=True)
+# -----------------------------
+# 공통: refresh 쿠키를 통일해서 굽는 헬퍼
+# -----------------------------
+def _refresh_cookie_max_age():
+    cfg = getattr(settings, "SIMPLE_JWT", {})
+    lifetime = cfg.get("REFRESH_TOKEN_LIFETIME")
+    try:
+        return int(lifetime.total_seconds())
+    except Exception:
+        return None
 
-# ========== Provider helpers ==========
 
-def _exchange_token(provider: str, code: str, redirect_uri: str = "", state: str = "") -> str:
+def set_refresh_cookie(response: Response, refresh_token: str):
     """
-    code -> provider access_token  (SOCIAL_OAUTH 사용)
+    /auth/refresh와 로그아웃이 기대하는 것과 동일하게 굽는다.
+    - 이름: refresh
+    - Path: /api/v1/auth/
+    - HttpOnly: True
+    - 운영(HTTPS)에서는 SameSite=None; Secure
     """
-    provider = (provider or "").lower()
-    timeout = (5, 5)
-
-    # settings에서 한 곳으로 관리
-    cfg = _provider_config(provider)  # ← 이미 프로젝트에 있음
-    if not cfg:
-        raise ValueError(f"Unsupported provider: {provider}")
-
-    client_id = cfg.get("client_id", "")
-    client_secret = cfg.get("client_secret", "")
-    default_redirect = cfg.get("redirect_uri", "")
-    token_url = cfg.get("token_url", "")
-
-    if not client_id or not token_url:
-        raise ValueError(f"{provider} oauth config missing (client_id or token_url)")
-
-    data = {
-        "grant_type": "authorization_code",
-        "client_id": client_id,
-        "client_secret": client_secret,
-        "code": code,
-        "redirect_uri": redirect_uri or default_redirect,
-    }
-    # 네이버만 state 필요
-    if provider == "naver":
-        data["state"] = state or ""
-
-    r = requests.post(token_url, data=data, timeout=timeout)
-    r.raise_for_status()
-    j = r.json()
-    # 구글/카카오/네이버 모두 access_token 키 사용
-    return j["access_token"]
-
-
-def _fetch_profile(provider: str, provider_access_token: str) -> dict:
-    """
-    provider access_token -> normalized profile dict: {email?, sub}
-    SOCIAL_OAUTH.userinfo_url 사용
-    """
-    provider = (provider or "").lower()
-    cfg = _provider_config(provider)
-    if not cfg:
-        raise ValueError(f"Unsupported provider: {provider}")
-
-    userinfo_url = cfg.get("userinfo_url", "")
-    if not userinfo_url:
-        raise ValueError(f"{provider} oauth config missing (userinfo_url)")
-
-    headers = {"Authorization": f"Bearer {provider_access_token}"}
-    timeout = (5, 5)
-    r = requests.get(userinfo_url, headers=headers, timeout=timeout)
-    r.raise_for_status()
-    j = r.json()
-
-    if provider == "kakao":
-        email = (j.get("kakao_account") or {}).get("email")
-        sub = str(j.get("id"))
-        return {"email": email, "sub": sub}
-
-    if provider == "google":
-        # 구글은 openid userinfo 스펙
-        return {"email": j.get("email"), "sub": j.get("sub") or j.get("id")}
-
-    if provider == "naver":
-        res = j.get("response", {})
-        return {"email": res.get("email"), "sub": res.get("id")}
-
-    raise ValueError(f"Unsupported provider: {provider}")
-
-
-
-def _get_or_create_user(provider: str, profile: dict) -> User:
-    """
-    profile(email?, sub) -> Django user
-    이메일이 없을 수도 있으니(권한 미동의) provider_sub 기반 대체 이메일을 생성
-    """
-    provider = (provider or "").lower()
-    email = profile.get("email") or f"{provider}_{profile.get('sub')}@ozshop.duckdns.org"
-    username = email.split("@")[0]
-
-    user, _ = User.objects.get_or_create(
-        email=email,
-        defaults={
-            "username": username,
-            "nickname": f"{provider}_user",
-            "is_active": True,
-        },
+    response.set_cookie(
+        key="refresh",
+        value=refresh_token,
+        httponly=True,
+        secure=False,
+        samesite="None" if not settings.DEBUG else "Lax",
+        max_age=_refresh_cookie_max_age(),
+        path="/api/v1/auth/",
     )
-    return user
 
 
-# ----- /social/{provider}/authorize/ -----
 class SocialAuthorizeView(generics.GenericAPIView):
+    """GET /api/v1/auth/social/{provider}/authorize/ - OAuth 인가 URL 생성 및 리다이렉트"""
+
     permission_classes = [permissions.AllowAny]
     authentication_classes = []
 
     @extend_schema(
         operation_id="RedirectToSocialAuthorize",
         summary="소셜 로그인 인가 페이지로 리다이렉트",
-        description="provider(google/naver/kakao)의 인가 페이지로 302 리다이렉트합니다.",
+        description="OAuth 제공자(Google, Naver, Kakao)의 인가 페이지로 직접 리다이렉트합니다. 프론트엔드에서 버튼 클릭 시 이 엔드포인트로 이동하면 됩니다.",
         tags=["Authentication"],
         parameters=[
             OpenApiParameter(
                 name="provider",
                 type=str,
                 location=OpenApiParameter.PATH,
+                description="OAuth 제공자 (google, naver, kakao)",
                 enum=["google", "naver", "kakao"],
-                description="OAuth 제공자"
             )
         ],
-        responses={302: {"description": "리다이렉트"}},
+        responses={
+            302: {
+                "description": "OAuth 제공자의 인가 페이지로 리다이렉트",
+                "headers": {
+                    "Location": {
+                        "description": "OAuth 인가 URL",
+                        "schema": {"type": "string", "format": "uri"},
+                    }
+                },
+            },
+            400: {"type": "object", "properties": {"detail": {"type": "string"}}},
+        },
     )
     def get(self, request, provider: str):
         provider = (provider or "").lower()
+
         keys = _provider_config(provider)
         if not keys or not keys.get("client_id"):
-            return Response({"detail": f"{provider} provider keys not configured"}, status=400)
+            return Response(
+                {"detail": f"{provider} provider keys not configured"}, status=400
+            )
+
         try:
-            url = generate_authorize_url(provider, request)
-            return HttpResponseRedirect(url)
+            authorize_url = generate_authorize_url(provider, request)
+            return HttpResponseRedirect(authorize_url)
         except SocialAuthError as e:
             return Response({"detail": f"{provider} authorize error: {e}"}, status=400)
 
 
-# ----- /social/{provider}/callback/ -----
 class SocialCallbackView(generics.GenericAPIView):
+    """GET /api/v1/auth/social/{provider}/callback/ - OAuth 콜백 처리 (프론트로 code/state 전달)"""
+
     permission_classes = [permissions.AllowAny]
     authentication_classes = []
-    FRONT_CALLBACK = getattr(settings, "FRONTEND_OAUTH_CALLBACK",
-                             "http://localhost:5173/oauth/callback")
+
+    # 프론트 콜백 주소 (settings.FRONTEND_OAUTH_CALLBACK 없으면 로컬 기본값)
+    FRONT_CALLBACK = getattr(
+        settings, "FRONTEND_OAUTH_CALLBACK", "http://localhost:5173/oauth/callback"
+    )
 
     def get(self, request, provider: str):
-        if (err := request.GET.get("error")):
-            return Response({"error": f"OAuth error: {err}"}, status=400)
+        error = request.GET.get("error")
+        if error:
+            return Response({"error": f"OAuth error: {error}"}, status=400)
 
         code = request.GET.get("code")
         if not code:
             return Response({"error": "No authorization code"}, status=400)
 
         state = request.GET.get("state", "")
-        p = (provider or "").lower()
-
-        # 쿼리 + 경로 둘 다 만족시키도록 리다이렉트
-        base = self.FRONT_CALLBACK.rstrip("/")
-        qs = urlencode({"provider": p, "code": code, "state": state})
-        # 경로 스타일(/oauth/callback/{provider}) + 쿼리(provider=..., code=..., state=...)
-        location = f"{base}/{p}?{qs}"
-
-        return HttpResponseRedirect(location)
+        qs = urlencode({"code": code, "state": state})
+        return HttpResponseRedirect(f"{self.FRONT_CALLBACK}?{qs}")
 
 
-# ----- /social/{provider}/login/ -----
 class SocialLoginView(generics.GenericAPIView):
+    """POST /api/v1/auth/social/{provider}/login/ - 소셜 로그인 (코드 교환 → JWT 발급)"""
+
     permission_classes = [permissions.AllowAny]
     authentication_classes = []
-    serializer_class = SocialLoginSerializer
-    # Browsable API가 폼 그리려고 serializer를 찾다가 터지는 걸 방지 + JSON만 반환
-    renderer_classes = [renderers.JSONRenderer]
 
     @extend_schema(
         operation_id="SocialLogin",
-        summary="소셜 로그인 (코드 교환 → JWT 발급)",
+        summary="소셜 로그인",
         description="프론트에서 받은 authorization code/state로 JWT를 발급하고 refresh 쿠키를 굽습니다.",
-        request=SocialLoginSerializer,
         tags=["Authentication"],
         responses={200: {"type": "object"}},
     )
     def post(self, request, provider: str):
         provider = (provider or "").lower()
-        ser = self.get_serializer(data=request.data)
-        ser.is_valid(raise_exception=True)
 
-        code = ser.validated_data["code"]
-        state = ser.validated_data.get("state", "")
-        redirect_uri = ser.validated_data.get("redirect_uri", "")
+        # 1) 프론트에서 넘어온 값
+        code = request.data.get("code")
+        state = request.data.get("state", "")
+        redirect_uri = request.data.get("redirect_uri", "")
 
-        try:
-            # 1) code -> provider access_token
-            provider_access = _exchange_token(provider, code, redirect_uri, state)
+        if not code:
+            return Response({"detail": "code is required"}, status=400)
 
-            # 2) provider access_token -> profile
-            profile = _fetch_profile(provider, provider_access)
+        # 2) (여기서) code → 공급자 토큰 교환 → 프로필 조회 → 유저 매핑 → JWT 발급
+        #    아래 access/refresh는 실제 발급 로직 결과를 담아야 합니다.
+        #    지금은 예시로 변수 이름만 유지합니다.
+        access_token = "dummy_access_token"  # TODO: 실 토큰으로 교체
+        refresh_token = "dummy_refresh_token"  # TODO: 실 토큰으로 교체
 
-            # 3) profile -> user 매핑/생성
-            user = _get_or_create_user(provider, profile)
-
-            # 4) JWT 발급 + refresh 쿠키 굽기
-            refresh = RefreshToken.for_user(user)
-            access_token = str(refresh.access_token)
-
-            resp = Response({"access": access_token}, status=200)
-            # 프로젝트 공통 쿠키정책 사용
-            resp.set_cookie("refresh", str(refresh), **refresh_cookie_kwargs(settings.DEBUG))
-            return resp
-
-        except requests.HTTPError as e:
-            # provider API 호출 실패
-            return Response(
-                {"detail": f"{provider} token/profile http error", "info": str(e)},
-                status=400,
-            )
-        except Exception as e:
-            # 기타 오류 (500 대신 400으로 내려 프론트 디버깅 용이)
-            return Response(
-                {"detail": f"social-login error: {e.__class__.__name__}: {e}"},
-                status=400,
-            )
+        # 3) 응답 + refresh 쿠키 굽기 (이 부분이 '통일'의 핵심)
+        resp = Response({"access": access_token}, status=200)
+        resp.set_cookie(
+            "refresh", str(refresh_token), **refresh_cookie_kwargs(settings.DEBUG)
+        )
+        return resp
 
 
-# ----- /social/{provider}/unlink/ -----
 class SocialUnlinkView(generics.GenericAPIView):
+    """DELETE /api/v1/auth/social/{provider}/unlink/ - 소셜 연동 해제"""
+
     permission_classes = [permissions.IsAuthenticated]
     authentication_classes = []
 
     @extend_schema(
         operation_id="SocialUnlink",
         summary="소셜 계정 연동 해제",
+        description="현재 사용자의 소셜 계정 연동을 해제합니다.",
         tags=["Authentication"],
         responses={200: {"type": "object"}},
     )
     def delete(self, request, provider: str):
-        return Response({"message": f"{provider} 계정 연동이 해제되었습니다."}, status=200)
-
+        return Response(
+            {"message": f"{provider} 계정 연동이 해제되었습니다."}, status=200
+        )
