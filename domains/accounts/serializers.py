@@ -31,11 +31,6 @@ class UserRoleUpdateSerializer(serializers.ModelSerializer):
         return value
 
 
-class EmptySerializer(serializers.Serializer):
-    """본문이 없는 요청/응답에 쓰는 더미"""
-    pass
-
-
 class TokenResponseSerializer(serializers.Serializer):
     access = serializers.CharField()
 

@@ -13,23 +13,29 @@ class PaymentProvider(models.TextChoices):
 
 
 class PaymentMethod(models.TextChoices):
+    # 테스트 위젯에서 실제 사용되는 결제수단만 유지
     CARD = "card", "Card"
-    VIRTUAL_ACCOUNT = "virtual_account", "Virtual Account"
-    ACCOUNT_TRANSFER = "account_transfer", "Account Transfer"
-    MOBILE_PHONE = "mobile_phone", "Mobile Phone"
-    EASY_PAY = "easy_pay", "Easy Pay"
-    GIFT_CERT = "gift_certificate", "Gift Certificate"
+    
+    # 실제 서비스에서 필요할 수 있는 결제수단들 (주석 처리)
+    # VIRTUAL_ACCOUNT = "virtual_account", "Virtual Account"
+    # ACCOUNT_TRANSFER = "account_transfer", "Account Transfer"
+    # MOBILE_PHONE = "mobile_phone", "Mobile Phone"
+    # EASY_PAY = "easy_pay", "Easy Pay"
+    # GIFT_CERT = "gift_certificate", "Gift Certificate"
 
 
 class PaymentStatus(models.TextChoices):
+    # 테스트 위젯에서 실제 사용되는 상태만 유지
     READY = "ready", "Ready"
-    IN_PROGRESS = "in_progress", "In Progress"
-    WAITING_FOR_DEPOSIT = "waiting_for_deposit", "Waiting for Deposit"
     PAID = "paid", "Paid"
-    PARTIAL_CANCELED = "partial_canceled", "Partial Canceled"
     CANCELED = "canceled", "Canceled"
-    FAILED = "failed", "Failed"
-    EXPIRED = "expired", "Expired"
+    
+    # 실제 서비스에서 필요할 수 있는 상태들 (주석 처리)
+    # IN_PROGRESS = "in_progress", "In Progress"
+    # WAITING_FOR_DEPOSIT = "waiting_for_deposit", "Waiting for Deposit"
+    # PARTIAL_CANCELED = "partial_canceled", "Partial Canceled"
+    # FAILED = "failed", "Failed"
+    # EXPIRED = "expired", "Expired"
 
 
 class CancelStatus(models.TextChoices):

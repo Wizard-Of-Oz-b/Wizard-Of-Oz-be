@@ -96,7 +96,7 @@ def checkout(user) -> Tuple[Purchase, "Payment"]:
     단일 주문 헤더(Purchase)와 결제 스텁을 생성한다.
     - 카트가 비어있으면 EmptyCartError
     - 재고 확보 실패 시 ValidationError
-    - 이 단계에서는 카트를 비우지 않는다(결제 확정 후 비움)
+    - 체크아웃 시점에 OrderItem 생성하여 스냅샷 보장
     """
     # 0) 카트 로드(+프리패치)
     cart: Optional[Cart] = (
@@ -124,49 +124,58 @@ def checkout(user) -> Tuple[Purchase, "Payment"]:
         grand_total=0,
     )
 
-    # 2) 재고 확보 + 라인 생성 (락)
+    # 2) 재고 차감 + 총액 계산 + OrderItem 생성
     items_qs = (
         cart.items.select_related("product")
-        .select_for_update()
         .order_by("product_id", "option_key")
     )
 
-    try:
-        for it in items_qs:
-            reserve_stock(it.product_id, it.option_key or "", it.quantity)
-    except (OutOfStockError, StockRowMissing) as e:
-        # 헤더 생성했더라도 트랜잭션 전체 롤백되므로 안전
-        raise ValidationError({"stock": str(e)})
-
+    items_to_create = []
     line_total_sum = 0
-    order_items: list[OrderItem] = []
+    
     for it in items_qs:
-        p = it.product
-        order_items.append(
+        from domains.orders.models import OrderItem
+        from domains.catalog.services import reserve_stock
+        
+        # 재고 차감
+        reserve_stock(it.product_id, it.option_key or "", it.quantity)
+        
+        # 총액 계산
+        line_total_sum += (it.unit_price * it.quantity)
+        
+        # OrderItem 생성 준비
+        items_to_create.append(
             OrderItem(
                 order=order,
                 product_id=it.product_id,
-                stock=None,                 # variant/stock 사용 시 연결
-                product_name=p.name,        # 스냅샷
-                thumbnail_url=getattr(p, "thumbnail_url", None),
-                sku=None,
+                stock_id=None,
+                product_name=it.product.name,
+                thumbnail_url=getattr(it.product, "thumbnail_url", "") or "",
+                sku="",
                 option_key=it.option_key or "",
                 options=it.options or {},
                 unit_price=it.unit_price,
                 quantity=it.quantity,
+                line_discount=0,
+                line_tax=0,
                 currency="KRW",
             )
         )
-        line_total_sum += (it.unit_price * it.quantity)
 
-    OrderItem.objects.bulk_create(order_items)
+    # 3) OrderItem 생성
+    OrderItem.objects.bulk_create(items_to_create)
 
-    # 3) 헤더 합계 반영
+    # 4) 헤더 합계 반영
     order.items_total = line_total_sum
     order.grand_total = line_total_sum  # 배송비/쿠폰 있으면 계산식 반영
     order.save(update_fields=["items_total", "grand_total"])
 
-    # 4) 결제 스텁 생성
+
+    # 5) 장바구니 비우기
+    from domains.carts.services import clear_cart as clear_cart_items
+    clear_cart_items(cart)
+
+    # 6) 결제 스텁 생성
     from domains.payments.services import create_payment_stub
     payment = create_payment_stub(order, amount=order.grand_total)
     return order, payment
@@ -198,6 +207,28 @@ def refund_purchase(purchase: Purchase) -> Purchase:
 # ─────────────────────────────────────────────────────────────────────────────
 # 결제 승인 직후: 카트 -> OrderItem 생성(멱등)
 # ─────────────────────────────────────────────────────────────────────────────
+def validate_cart_stock(user) -> None:
+    """
+    장바구니의 모든 아이템 재고를 사전 검증 (토스 결제 전)
+    재고 부족 시 ValidationError 발생
+    """
+    from domains.carts.services import get_user_cart
+    
+    cart = get_user_cart(user, create=False)
+    if not cart or not cart.items.exists():
+        raise EmptyCartError({"cart": "장바구니가 비어 있습니다."})
+    
+    # 각 아이템의 재고 검증
+    for ci in cart.items.select_related("product"):
+        try:
+            from domains.catalog.services import check_stock_availability
+            check_stock_availability(ci.product_id, ci.option_key or "", ci.quantity)
+        except (OutOfStockError, StockRowMissing) as e:
+            raise ValidationError({
+                "stock": f"재고 부족: {ci.product.name} (필요: {ci.quantity}, 옵션: {ci.option_key or '없음'}) - {str(e)}"
+            })
+
+
 @transaction.atomic
 def create_order_items_from_cart(purchase: Purchase) -> int:
     """
@@ -217,8 +248,14 @@ def create_order_items_from_cart(purchase: Purchase) -> int:
         .filter(user=purchase.user)
         .first()
     )
-    if not cart or not cart.items.exists():
-        return 0
+    
+    # 장바구니가 없으면 오류
+    if not cart:
+        raise EmptyCartError({"cart": "장바구니가 없습니다."})
+    
+    # 장바구니가 비어있으면 오류 (체크아웃 시점에 이미 검증되었지만 안전장치)
+    if not cart.items.exists():
+        raise EmptyCartError({"cart": "장바구니가 비어 있습니다."})
 
     items_to_create: list[OrderItem] = []
 
@@ -247,8 +284,9 @@ def create_order_items_from_cart(purchase: Purchase) -> int:
     except (OutOfStockError, StockRowMissing) as e:
         raise ValidationError({"stock": str(e)})
 
+    # OrderItem 생성 (실패 시 트랜잭션 롤백으로 재고도 복구됨)
     OrderItem.objects.bulk_create(items_to_create)
 
-    # 카트 비우기
+    # ✅ OrderItem 생성 성공 후에만 카트 비우기
     clear_cart_items(cart)
     return len(items_to_create)

@@ -174,3 +174,18 @@ class AddCartItemSerializer(serializers.Serializer):
 
     def to_representation(self, instance: CartItem) -> Dict[str, Any]:
         return CartItemSerializer(instance, context=self.context).data
+
+
+# ---------------------------
+# Update serializers
+# ---------------------------
+class UpdateCartQtySerializer(serializers.Serializer):
+    """장바구니 아이템 수량 변경용 시리얼라이저"""
+    quantity = serializers.IntegerField(min_value=1)
+
+
+class UpdateCartItemSerializer(serializers.Serializer):
+    """장바구니 아이템 수량 및 옵션 변경용 시리얼라이저"""
+    quantity = serializers.IntegerField(min_value=1, required=False)
+    option_key = serializers.CharField(required=False, allow_blank=True, default="")
+    options = serializers.JSONField(required=False, default=dict)

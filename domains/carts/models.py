@@ -41,6 +41,11 @@ class Cart(models.Model):
             models.Index(fields=["expires_at"]),
         ]
 
+        # 한 유저 1카트 정책 강제
+        constraints = [
+            models.UniqueConstraint(fields=["user"], name="uq_user_single_cart")
+        ]
+
 
     def __str__(self) -> str:  # pragma: no cover
         return f"Cart({self.pk}) of {self.user_id}"
