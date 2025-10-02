@@ -23,9 +23,7 @@ from domains.orders.services import (  # ← 추가
 from .models import CancelStatus, Payment, PaymentEvent, PaymentStatus
 from .serializers import PaymentCancelRequestSerializer, PaymentReadSerializer
 from .serializers_toss import TossConfirmRequestSerializer
-from .toss_client import cancel as toss_cancel
-from .toss_client import confirm as toss_confirm
-from .toss_client import retrieve_by_key
+from .toss_client import cancel as toss_cancel, confirm as toss_confirm, retrieve_by_key
 
 
 # ─────────────────────────────────────────────────────────────────────────────

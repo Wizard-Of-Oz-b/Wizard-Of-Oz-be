@@ -11,7 +11,7 @@ from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from domains.carts.models import Cart, CartItem
-from domains.carts.services import clear_cart as clear_cart_items  # 장바구니 비우기 헬퍼
+from domains.carts.services import clear_cart as clear_cart_items
 from domains.catalog.services import (
     OutOfStockError,
     StockRowMissing,

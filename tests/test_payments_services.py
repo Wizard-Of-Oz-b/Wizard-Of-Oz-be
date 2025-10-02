@@ -14,8 +14,10 @@ from domains.accounts.models import User
 from domains.carts.models import Cart, CartItem
 from domains.catalog.models import Product, ProductStock
 from domains.orders.models import OrderItem, Purchase
-from domains.payments.models import Payment as PaymentModel
-from domains.payments.models import PaymentEvent as PaymentEventModel
+from domains.payments.models import (
+    Payment as PaymentModel,
+    PaymentEvent as PaymentEventModel,
+)
 from domains.payments.services import (
     ORDER_STATUS_CANCELED,
     ORDER_STATUS_PAID,

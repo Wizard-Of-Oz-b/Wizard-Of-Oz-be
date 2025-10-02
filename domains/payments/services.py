@@ -141,8 +141,7 @@ def confirm_payment(
         order.save(update_fields=["status"])
 
     # 카트 비우기 (지연 import)
-    from domains.carts.services import clear_cart as clear_cart_items
-    from domains.carts.services import get_user_cart
+    from domains.carts.services import clear_cart as clear_cart_items, get_user_cart
 
     cart = get_user_cart(order.user, create=False)
     clear_cart_items(cart)
