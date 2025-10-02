@@ -5,8 +5,9 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models import F, Sum, DecimalField, ExpressionWrapper
+from django.db.models import DecimalField, ExpressionWrapper, F, Sum
 from django.utils import timezone
 
 from domains.catalog.models import Product
@@ -80,7 +81,7 @@ class CartItem(models.Model):
     cart = models.ForeignKey(
         Cart,
         on_delete=models.CASCADE,
-        related_name="items",   # ← 역참조: cart.items
+        related_name="items",  # ← 역참조: cart.items
         db_column="cart_id",
     )
     product = models.ForeignKey(
@@ -126,9 +127,9 @@ class CartItem(models.Model):
             self.quantity = 1
         # unit_price 음수 금지
         if self.unit_price is None:
-            raise models.ValidationError({"unit_price": "가격 스냅샷은 필수입니다."})
+            raise ValidationError({"unit_price": "가격 스냅샷은 필수입니다."})
         if self.unit_price < 0:
-            raise models.ValidationError({"unit_price": "가격은 0 이상이어야 합니다."})
+            raise ValidationError({"unit_price": "가격은 0 이상이어야 합니다."})
 
     def save(self, *args, **kwargs):
         # clean() 보장

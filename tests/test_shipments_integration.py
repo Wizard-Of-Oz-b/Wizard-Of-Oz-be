@@ -1,8 +1,9 @@
 import pytest
+
 from domains.orders.models import Purchase
 from domains.shipments import services as svc
-from domains.shipments.models import Shipment, ShipmentEvent, ShipmentStatus
 from domains.shipments.adapters.sweettracker import SweetTrackerAdapter
+from domains.shipments.models import Shipment, ShipmentEvent, ShipmentStatus
 
 
 def S(*names):
@@ -58,9 +59,13 @@ def test_register_shipment_success(monkeypatch, owner, paid_purchase):
 
     def fake_register_tracking(self, *, tracking_number, carrier, fid):
         # 호출 파라미터 저장만 하고 아무 것도 안 함
-        calls.append({"tracking_number": tracking_number, "carrier": carrier, "fid": fid})
+        calls.append(
+            {"tracking_number": tracking_number, "carrier": carrier, "fid": fid}
+        )
 
-    monkeypatch.setattr(SweetTrackerAdapter, "register_tracking", fake_register_tracking)
+    monkeypatch.setattr(
+        SweetTrackerAdapter, "register_tracking", fake_register_tracking
+    )
 
     sh = svc.register_tracking_with_sweettracker(
         tracking_number="CJT-0001",

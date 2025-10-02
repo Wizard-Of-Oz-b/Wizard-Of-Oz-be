@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+
 from django.db import models
 from django.utils import timezone
 
@@ -15,7 +16,7 @@ class PaymentProvider(models.TextChoices):
 class PaymentMethod(models.TextChoices):
     # 테스트 위젯에서 실제 사용되는 결제수단만 유지
     CARD = "card", "Card"
-    
+
     # 실제 서비스에서 필요할 수 있는 결제수단들 (주석 처리)
     # VIRTUAL_ACCOUNT = "virtual_account", "Virtual Account"
     # ACCOUNT_TRANSFER = "account_transfer", "Account Transfer"
@@ -29,7 +30,7 @@ class PaymentStatus(models.TextChoices):
     READY = "ready", "Ready"
     PAID = "paid", "Paid"
     CANCELED = "canceled", "Canceled"
-    
+
     # 실제 서비스에서 필요할 수 있는 상태들 (주석 처리)
     # IN_PROGRESS = "in_progress", "In Progress"
     # WAITING_FOR_DEPOSIT = "waiting_for_deposit", "Waiting for Deposit"
@@ -64,7 +65,7 @@ class Payment(models.Model):
     provider_payment_key = models.CharField(  # Toss paymentKey
         max_length=200, unique=True, null=True, blank=True
     )
-    order_number = models.CharField(          # Toss orderId 로 사용
+    order_number = models.CharField(  # Toss orderId 로 사용
         max_length=100, unique=True, null=True, blank=True
     )
 
@@ -116,9 +117,13 @@ class Payment(models.Model):
 # ─────────────────────────────────────────────────────────────────────────────
 class PaymentEvent(models.Model):
     event_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    payment = models.ForeignKey(Payment, on_delete=models.CASCADE, related_name="events")
+    payment = models.ForeignKey(
+        Payment, on_delete=models.CASCADE, related_name="events"
+    )
     source = models.CharField(max_length=20)  # webhook | sync | manual | api
-    event_type = models.CharField(max_length=40)  # status_changed | approval | cancel | fail | etc
+    event_type = models.CharField(
+        max_length=40
+    )  # status_changed | approval | cancel | fail | etc
     provider_status = models.CharField(
         max_length=32, choices=PaymentStatus.choices, null=True, blank=True
     )
@@ -140,7 +145,13 @@ class PaymentEvent(models.Model):
 # ─────────────────────────────────────────────────────────────────────────────
 class PaymentCancel(models.Model):
     cancel_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    payment = models.ForeignKey(Payment, on_delete=models.CASCADE, related_name="cancels")
+
+    payment = models.ForeignKey(
+        Payment, on_delete=models.CASCADE, related_name="cancels"
+    )
+    # 필요 시 order_item FK 연결 가능
+    # order_item = models.ForeignKey("orders.OrderItem", ...)
+
 
     status = models.CharField(
         max_length=16, choices=CancelStatus.choices, default=CancelStatus.REQUESTED

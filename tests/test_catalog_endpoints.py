@@ -1,6 +1,7 @@
 import pytest
 from rest_framework.test import APIClient
 
+
 @pytest.mark.django_db
 def test_catalog_list_and_product_detail(product_factory):
     p = product_factory()

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import uuid
-from django.db import models
+
 from django.core.exceptions import ValidationError
+from django.db import models
 
 
 # ------------------------
@@ -26,7 +27,7 @@ class Category(models.Model):
     # 계층 (부모가 없으면 L1)
     parent = models.ForeignKey(
         "self",
-        on_delete=models.PROTECT,   # 상위가 있으면 삭제 금지(데이터 보전)
+        on_delete=models.PROTECT,  # 상위가 있으면 삭제 금지(데이터 보전)
         null=True,
         blank=True,
         related_name="children",
@@ -78,7 +79,11 @@ class Category(models.Model):
         if self.parent is None:
             expected = CategoryLevel.L1
         else:
-            expected = CategoryLevel.L2 if self.parent.level == CategoryLevel.L1 else CategoryLevel.L3
+            expected = (
+                CategoryLevel.L2
+                if self.parent.level == CategoryLevel.L1
+                else CategoryLevel.L3
+            )
 
         # 입력된 level이 달라도 자동으로 맞춰줌
         self.level = expected
@@ -104,7 +109,9 @@ class Category(models.Model):
         """
         for child in self.children.all():
             child.path = f"{self.path} > {child.name}"
-            child.level = CategoryLevel.L2 if self.level == CategoryLevel.L1 else CategoryLevel.L3
+            child.level = (
+                CategoryLevel.L2 if self.level == CategoryLevel.L1 else CategoryLevel.L3
+            )
             child.save(update_fields=["path", "level", "updated_at"])
             child.rebuild_descendant_paths()
 
@@ -136,7 +143,7 @@ class Product(models.Model):
         Category,
         null=True,
         blank=True,
-        on_delete=models.SET_NULL,    # 또는 PROTECT
+        on_delete=models.SET_NULL,  # 또는 PROTECT
         db_column="category_id",
         related_name="products",
     )
@@ -166,6 +173,7 @@ class ProductStock(models.Model):
     옵션 조합(option_key)별 재고.
     예: "size=L&color=red"
     """
+
     id = models.UUIDField(
         primary_key=True,
         default=uuid.uuid4,
@@ -179,7 +187,7 @@ class ProductStock(models.Model):
         db_column="product_id",
     )
     option_key = models.CharField(max_length=64, blank=True, default="")
-    options    = models.JSONField(blank=True, default=dict)    # 표시/검증용 옵션 스냅샷
+    options = models.JSONField(blank=True, default=dict)  # 표시/검증용 옵션 스냅샷
     stock_quantity = models.IntegerField(default=0)
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -216,6 +224,7 @@ class ProductImage(models.Model):
     - 특정 옵션(variant) 이미지에 매핑하려면 stock 사용(선택)
     - is_remote=True 이면 remote_url만 참조(다운로드 X)
     """
+
     id = models.UUIDField(
         primary_key=True,
         default=uuid.uuid4,
@@ -244,10 +253,10 @@ class ProductImage(models.Model):
 
     # URL만 참조(다운로드 X)
     remote_url = models.URLField(blank=True, null=True)
-    is_remote  = models.BooleanField(default=False)
+    is_remote = models.BooleanField(default=False)
 
     alt_text = models.CharField(max_length=255, blank=True, default="")
-    caption  = models.CharField(max_length=255, blank=True, default="")
+    caption = models.CharField(max_length=255, blank=True, default="")
 
     is_main = models.BooleanField(default=False)
     display_order = models.IntegerField(default=0, db_index=True)
@@ -285,9 +294,14 @@ class ProductImage(models.Model):
     # 한쪽만 필수(파일 or 원격)
     def clean(self):
         from django.core.exceptions import ValidationError
+
         if self.is_remote:
             if not self.remote_url:
-                raise ValidationError({"remote_url": "is_remote=True면 remote_url이 필요합니다."})
+                raise ValidationError(
+                    {"remote_url": "is_remote=True면 remote_url이 필요합니다."}
+                )
         else:
             if not self.image:
-                raise ValidationError({"image": "is_remote=False면 image 파일이 필요합니다."})
+                raise ValidationError(
+                    {"image": "is_remote=False면 image 파일이 필요합니다."}
+                )

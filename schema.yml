@@ -1,0 +1,5426 @@
+openapi: 3.0.3
+info:
+  title: Fashion Shop API
+  version: 1.0.0
+  description: Shop / Admin endpoints with JWT (Bearer).
+paths:
+  /api/v1/admin/categories/:
+    get:
+      operationId: admin_categories_list
+      description: |-
+        /api/v1/admin/categories/
+        - GET ?level=l1        : 대분류만
+        - GET ?parent=<uuid>   : 특정 부모의 하위만
+      parameters:
+      - in: query
+        name: level
+        schema:
+          type: string
+      - in: query
+        name: name
+        schema:
+          type: string
+      - name: ordering
+        required: false
+        in: query
+        description: 결과 정렬 시 사용할 필드.
+        schema:
+          type: string
+      - in: query
+        name: parent
+        schema:
+          type: string
+          format: uuid
+      - name: search
+        required: false
+        in: query
+        description: 검색어.
+        schema:
+          type: string
+      tags:
+      - Admin • Categories
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CategoryAdmin'
+          description: ''
+    post:
+      operationId: admin_categories_create
+      description: |-
+        /api/v1/admin/categories/
+        - GET ?level=l1        : 대분류만
+        - GET ?parent=<uuid>   : 특정 부모의 하위만
+      tags:
+      - Admin • Categories
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoryAdminRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CategoryAdminRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CategoryAdminRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryAdmin'
+          description: ''
+  /api/v1/admin/categories/{id}/:
+    get:
+      operationId: admin_categories_retrieve
+      description: |-
+        /api/v1/admin/categories/
+        - GET ?level=l1        : 대분류만
+        - GET ?parent=<uuid>   : 특정 부모의 하위만
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Category을 식별하는 UUID 문자열.
+        required: true
+      tags:
+      - Admin • Categories
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryAdmin'
+          description: ''
+    put:
+      operationId: admin_categories_update
+      description: |-
+        /api/v1/admin/categories/
+        - GET ?level=l1        : 대분류만
+        - GET ?parent=<uuid>   : 특정 부모의 하위만
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Category을 식별하는 UUID 문자열.
+        required: true
+      tags:
+      - Admin • Categories
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoryAdminRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CategoryAdminRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CategoryAdminRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryAdmin'
+          description: ''
+    patch:
+      operationId: admin_categories_partial_update
+      description: |-
+        /api/v1/admin/categories/
+        - GET ?level=l1        : 대분류만
+        - GET ?parent=<uuid>   : 특정 부모의 하위만
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Category을 식별하는 UUID 문자열.
+        required: true
+      tags:
+      - Admin • Categories
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedCategoryAdminRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedCategoryAdminRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedCategoryAdminRequest'
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryAdmin'
+          description: ''
+    delete:
+      operationId: admin_categories_destroy
+      description: |-
+        /api/v1/admin/categories/
+        - GET ?level=l1        : 대분류만
+        - GET ?parent=<uuid>   : 특정 부모의 하위만
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Category을 식별하는 UUID 문자열.
+        required: true
+      tags:
+      - Admin • Categories
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/admin/orders/:
+    get:
+      operationId: admin_orders_list
+      description: |-
+        GET /api/v1/admin/orders/
+        GET /api/v1/admin/orders/{id}/
+      parameters:
+      - in: query
+        name: created_from
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: created_to
+        schema:
+          type: string
+          format: date-time
+      - name: ordering
+        required: false
+        in: query
+        description: 결과 정렬 시 사용할 필드.
+        schema:
+          type: string
+      - name: search
+        required: false
+        in: query
+        description: 검색어.
+        schema:
+          type: string
+      - in: query
+        name: status
+        schema:
+          type: string
+      - in: query
+        name: user_email
+        schema:
+          type: string
+      tags:
+      - Admin • Orders
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PurchaseAdmin'
+          description: ''
+  /api/v1/admin/orders/{order_id}/cancel/:
+    patch:
+      operationId: AdminOrderCancel
+      summary: 주문 취소(ADMIN·MANAGER)
+      parameters:
+      - in: path
+        name: order_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Admin • Orders
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderActionResponse'
+          description: ''
+  /api/v1/admin/orders/{order_id}/refund/:
+    patch:
+      operationId: AdminOrderRefund
+      summary: 주문 환불(ADMIN)
+      parameters:
+      - in: path
+        name: order_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Admin • Orders
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderActionResponse'
+          description: ''
+  /api/v1/admin/orders/{purchase_id}/:
+    get:
+      operationId: admin_orders_retrieve
+      description: |-
+        GET /api/v1/admin/orders/
+        GET /api/v1/admin/orders/{id}/
+      parameters:
+      - in: path
+        name: purchase_id
+        schema:
+          type: string
+          format: uuid
+        description: purchase을 식별하는 UUID 문자열.
+        required: true
+      tags:
+      - Admin • Orders
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseAdmin'
+          description: ''
+  /api/v1/admin/product-stocks/:
+    get:
+      operationId: admin_product_stocks_list
+      description: /api/v1/admin/product-stocks/
+      parameters:
+      - in: query
+        name: option_key
+        schema:
+          type: string
+      - name: ordering
+        required: false
+        in: query
+        description: 결과 정렬 시 사용할 필드.
+        schema:
+          type: string
+      - in: query
+        name: product
+        schema:
+          type: string
+          format: uuid
+      - name: search
+        required: false
+        in: query
+        description: 검색어.
+        schema:
+          type: string
+      tags:
+      - Admin • Stocks
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProductStockAdmin'
+          description: ''
+    post:
+      operationId: admin_product_stocks_create
+      description: /api/v1/admin/product-stocks/
+      tags:
+      - Admin • Stocks
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductStockAdminRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ProductStockAdminRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProductStockAdminRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductStockAdmin'
+          description: ''
+  /api/v1/admin/product-stocks/{id}/:
+    get:
+      operationId: admin_product_stocks_retrieve
+      description: /api/v1/admin/product-stocks/
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: product stock을 식별하는 UUID 문자열.
+        required: true
+      tags:
+      - Admin • Stocks
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductStockAdmin'
+          description: ''
+    put:
+      operationId: admin_product_stocks_update
+      description: /api/v1/admin/product-stocks/
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: product stock을 식별하는 UUID 문자열.
+        required: true
+      tags:
+      - Admin • Stocks
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductStockAdminRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ProductStockAdminRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProductStockAdminRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductStockAdmin'
+          description: ''
+    patch:
+      operationId: admin_product_stocks_partial_update
+      description: /api/v1/admin/product-stocks/
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: product stock을 식별하는 UUID 문자열.
+        required: true
+      tags:
+      - Admin • Stocks
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedProductStockAdminRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedProductStockAdminRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedProductStockAdminRequest'
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductStockAdmin'
+          description: ''
+    delete:
+      operationId: admin_product_stocks_destroy
+      description: /api/v1/admin/product-stocks/
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: product stock을 식별하는 UUID 문자열.
+        required: true
+      tags:
+      - Admin • Stocks
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/admin/products/:
+    get:
+      operationId: admin_products_list
+      description: |-
+        /api/v1/admin/products/
+        + /api/v1/admin/products/{id}/images/  (GET 목록, POST 업로드)
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: 결과 정렬 시 사용할 필드.
+        schema:
+          type: string
+      - name: search
+        required: false
+        in: query
+        description: 검색어.
+        schema:
+          type: string
+      tags:
+      - Admin • Products
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProductAdmin'
+          description: ''
+    post:
+      operationId: admin_products_create
+      description: |-
+        /api/v1/admin/products/
+        + /api/v1/admin/products/{id}/images/  (GET 목록, POST 업로드)
+      tags:
+      - Admin • Products
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProductAdminRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ProductAdminRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductAdminRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductAdmin'
+          description: ''
+  /api/v1/admin/products/{id}/:
+    get:
+      operationId: admin_products_retrieve
+      description: |-
+        /api/v1/admin/products/
+        + /api/v1/admin/products/{id}/images/  (GET 목록, POST 업로드)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: product을 식별하는 UUID 문자열.
+        required: true
+      tags:
+      - Admin • Products
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductAdmin'
+          description: ''
+    put:
+      operationId: admin_products_update
+      description: |-
+        /api/v1/admin/products/
+        + /api/v1/admin/products/{id}/images/  (GET 목록, POST 업로드)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: product을 식별하는 UUID 문자열.
+        required: true
+      tags:
+      - Admin • Products
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProductAdminRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ProductAdminRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductAdminRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductAdmin'
+          description: ''
+    patch:
+      operationId: admin_products_partial_update
+      description: |-
+        /api/v1/admin/products/
+        + /api/v1/admin/products/{id}/images/  (GET 목록, POST 업로드)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: product을 식별하는 UUID 문자열.
+        required: true
+      tags:
+      - Admin • Products
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedProductAdminRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedProductAdminRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedProductAdminRequest'
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductAdmin'
+          description: ''
+    delete:
+      operationId: admin_products_destroy
+      description: |-
+        /api/v1/admin/products/
+        + /api/v1/admin/products/{id}/images/  (GET 목록, POST 업로드)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: product을 식별하는 UUID 문자열.
+        required: true
+      tags:
+      - Admin • Products
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/admin/products/{id}/images/:
+    get:
+      operationId: AdminProductImages
+      description: |-
+        /api/v1/admin/products/
+        + /api/v1/admin/products/{id}/images/  (GET 목록, POST 업로드)
+      summary: 상품 이미지 업로드/목록 (파일, URL 저장, 또는 URL 참조)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: product을 식별하는 UUID 문자열.
+        required: true
+      - name: ordering
+        required: false
+        in: query
+        description: 결과 정렬 시 사용할 필드.
+        schema:
+          type: string
+      - name: search
+        required: false
+        in: query
+        description: 검색어.
+        schema:
+          type: string
+      tags:
+      - Admin • Products
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProductImageAdmin'
+          description: ''
+    post:
+      operationId: AdminProductImages_2
+      description: |-
+        /api/v1/admin/products/
+        + /api/v1/admin/products/{id}/images/  (GET 목록, POST 업로드)
+      summary: 상품 이미지 업로드/목록 (파일, URL 저장, 또는 URL 참조)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: product을 식별하는 UUID 문자열.
+        required: true
+      - name: ordering
+        required: false
+        in: query
+        description: 결과 정렬 시 사용할 필드.
+        schema:
+          type: string
+      - name: search
+        required: false
+        in: query
+        description: 검색어.
+        schema:
+          type: string
+      tags:
+      - Admin • Products
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProductImagesUploadRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ProductImagesUploadRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductImagesUploadRequest'
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProductImageAdmin'
+          description: ''
+  /api/v1/admin/users/:
+    get:
+      operationId: admin_users_list
+      description: |-
+        GET /api/v1/admin/users/
+        GET /api/v1/admin/users/{id}/
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: 결과 정렬 시 사용할 필드.
+        schema:
+          type: string
+      - name: search
+        required: false
+        in: query
+        description: 검색어.
+        schema:
+          type: string
+      tags:
+      - Admin • Users
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserMin'
+          description: ''
+  /api/v1/admin/users/{id}/:
+    get:
+      operationId: admin_users_retrieve
+      description: |-
+        GET /api/v1/admin/users/
+        GET /api/v1/admin/users/{id}/
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: user을 식별하는 UUID 문자열.
+        required: true
+      tags:
+      - Admin • Users
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserMin'
+          description: ''
+  /api/v1/admin/users/{user_id}/role/:
+    patch:
+      operationId: AdminChangeUserRole
+      summary: 사용자 역할 변경(ADMIN)
+      parameters:
+      - in: path
+        name: user_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Admin • Users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUserRoleUpdateRequest'
+            examples:
+              매니저로변경:
+                value:
+                  role: manager
+                summary: 매니저로 변경
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUserRoleUpdateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUserRoleUpdateRequest'
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserRoleUpdate'
+              examples:
+                매니저로변경:
+                  value:
+                    role: manager
+                  summary: 매니저로 변경
+          description: ''
+  /api/v1/auth/login/:
+    post:
+      operationId: auth_login_create
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/LoginRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/LoginRequestRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenPairResponse'
+          description: ''
+  /api/v1/auth/logout/:
+    post:
+      operationId: auth_logout_create
+      tags:
+      - auth
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '204':
+          description: 로그아웃 완료
+  /api/v1/auth/refresh/:
+    post:
+      operationId: auth_refresh_create
+      tags:
+      - auth
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenPairResponse'
+          description: ''
+  /api/v1/auth/register/:
+    post:
+      operationId: auth_register_create
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '201':
+          description: 회원가입 완료
+  /api/v1/auth/social/{provider}/authorize/:
+    get:
+      operationId: RedirectToSocialAuthorize
+      description: OAuth 제공자(Google, Naver, Kakao)의 인가 페이지로 직접 리다이렉트합니다. 프론트엔드에서 버튼
+        클릭 시 이 엔드포인트로 이동하면 됩니다.
+      summary: 소셜 로그인 인가 페이지로 리다이렉트
+      parameters:
+      - in: path
+        name: provider
+        schema:
+          type: string
+          enum:
+          - google
+          - kakao
+          - naver
+        description: OAuth 제공자 (google, naver, kakao)
+        required: true
+      tags:
+      - Authentication
+      security:
+      - BearerAuth: []
+      - {}
+      responses:
+        '302':
+          content:
+            application/json:
+              schema:
+                description: OAuth 제공자의 인가 페이지로 리다이렉트
+                headers:
+                  Location:
+                    description: OAuth 인가 URL
+                    schema:
+                      type: string
+                      format: uri
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+          description: ''
+  /api/v1/auth/social/{provider}/callback/:
+    get:
+      operationId: auth_social_callback_retrieve
+      description: GET /api/v1/auth/social/{provider}/callback/ - OAuth 콜백 처리 (프론트로
+        code/state 전달)
+      parameters:
+      - in: path
+        name: provider
+        schema:
+          type: string
+        required: true
+      tags:
+      - auth
+      security:
+      - BearerAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/v1/auth/social/{provider}/login/:
+    post:
+      operationId: SocialLogin
+      description: 프론트에서 받은 authorization code/state로 JWT를 발급하고 refresh 쿠키를 굽습니다.
+      summary: 소셜 로그인
+      parameters:
+      - in: path
+        name: provider
+        schema:
+          type: string
+        required: true
+      tags:
+      - Authentication
+      security:
+      - BearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+          description: ''
+  /api/v1/auth/social/{provider}/unlink/:
+    delete:
+      operationId: SocialUnlink
+      description: 현재 사용자의 소셜 계정 연동을 해제합니다.
+      summary: 소셜 계정 연동 해제
+      parameters:
+      - in: path
+        name: provider
+        schema:
+          type: string
+        required: true
+      tags:
+      - Authentication
+      security:
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+          description: ''
+  /api/v1/auth/token/:
+    post:
+      operationId: auth_token_create
+      description: |-
+        Takes a set of user credentials and returns an access and refresh JSON web
+        token pair to prove the authentication of those credentials.
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailTokenObtainPairRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/EmailTokenObtainPairRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/EmailTokenObtainPairRequest'
+        required: true
+      security:
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/auth/token/refresh/:
+    post:
+      operationId: auth_token_refresh_create
+      description: |-
+        Takes a refresh type JSON web token and returns an access type JSON web
+        token if the refresh token is valid.
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+        required: true
+      security:
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenRefresh'
+          description: ''
+  /api/v1/carts/clear/:
+    delete:
+      operationId: ClearMyCart
+      description: |-
+        DELETE /api/v1/carts/clear
+        → 내 카트 전체 비우기
+      tags:
+      - Carts
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/carts/items/:
+    post:
+      operationId: AddCartItem
+      description: |-
+        장바구니에 상품 추가.
+        - option_key 또는 options 중 하나만 사용(둘 다 비어있으면 '옵션 없음')
+        - 테스트/클라이언트 호환: payload에 product_id만 있을 경우 product로 자동 매핑
+        - 응답에서 image_url 절대경로를 위해 serializer context에 request 전달
+        - N+1 방지를 위해 product(+images) 프리패치 후 반환
+      tags:
+      - Carts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddCartItemRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AddCartItemRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AddCartItemRequest'
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartItem'
+          description: ''
+  /api/v1/carts/items/{item_id}/:
+    delete:
+      operationId: DeleteCartItemById
+      description: |-
+        DELETE /api/v1/carts/items/<item_id>/
+        본인 장바구니의 해당 item_id 한 줄만 삭제
+      parameters:
+      - in: path
+        name: item_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Carts
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '204':
+          description: No response body
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/carts/items/{item_id}/quantity/:
+    patch:
+      operationId: UpdateCartItemQuantity
+      description: |-
+        PATCH /api/v1/carts/items/{item_id}/quantity
+        body: { "quantity": <int>=1+ }
+      parameters:
+      - in: path
+        name: item_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Carts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateCartQtyRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateCartQtyRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateCartQtyRequest'
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartItem'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/carts/items/{item_id}/update/:
+    patch:
+      operationId: UpdateCartItemWithOptions
+      description: |-
+        장바구니 아이템의 수량과 옵션을 함께 업데이트.
+        - quantity: 수량 변경 (선택사항)
+        - option_key: 옵션 키 변경 (선택사항)
+        - options: 옵션 상세 정보 변경 (선택사항)
+      parameters:
+      - in: path
+        name: item_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Carts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateCartItemRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateCartItemRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateCartItemRequest'
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartItem'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/carts/items/by-product/{product_id}/:
+    delete:
+      operationId: DeleteCartItemByProductAndOption
+      description: |-
+        상품ID + option_key 조합으로 해당 라인만 삭제.
+        (옵션 없는 상품은 option_key=""로 호출)
+      parameters:
+      - in: query
+        name: option_key
+        schema:
+          type: string
+        description: 옵션키. 예) color=black&size=M (옵션 없는 상품은 빈 문자열 ''로 전달)
+        required: true
+      - in: path
+        name: product_id
+        schema:
+          type: string
+          format: uuid
+        description: 상품 ID (UUID)
+        required: true
+      tags:
+      - Carts
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '204':
+          content:
+            application/json:
+              schema:
+                description: 아이템이 성공적으로 삭제됨
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                description: 잘못된 요청 (option_key 누락 등)
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                description: 해당 상품+옵션 조합의 아이템을 찾을 수 없음
+          description: ''
+  /api/v1/carts/me/:
+    get:
+      operationId: GetMyCart
+      description: |-
+        내 카트 조회.
+        - N+1 방지: items -> product (및 product.images / productimage_set까지) prefetch
+        - 이미지 절대 URL을 위해 serializer context에 request 전달
+      tags:
+      - Carts
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cart'
+          description: ''
+  /api/v1/categories/:
+    get:
+      operationId: ListCategories
+      description: |-
+        GET  /api/v1/categories         (전체 목록)
+        POST /api/v1/categories         (관리자 전용, name만 생성)
+      tags:
+      - categories
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Category'
+          description: ''
+    post:
+      operationId: CreateCategory
+      description: |-
+        GET  /api/v1/categories         (전체 목록)
+        POST /api/v1/categories         (관리자 전용, name만 생성)
+      tags:
+      - categories
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoryWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CategoryWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CategoryWriteRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+          description: ''
+  /api/v1/categories/{category_id}/:
+    get:
+      operationId: RetrieveCategory
+      description: |-
+        GET    /api/v1/categories/{category_id}
+        PATCH  /api/v1/categories/{category_id}   (관리자)
+        DELETE /api/v1/categories/{category_id}   (관리자, 해당 카테고리에 상품 있으면 409)
+      parameters:
+      - in: path
+        name: category_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - categories
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+          description: ''
+    put:
+      operationId: categories_update
+      description: |-
+        GET    /api/v1/categories/{category_id}
+        PATCH  /api/v1/categories/{category_id}   (관리자)
+        DELETE /api/v1/categories/{category_id}   (관리자, 해당 카테고리에 상품 있으면 409)
+      parameters:
+      - in: path
+        name: category_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - categories
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoryRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CategoryRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CategoryRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+          description: ''
+    patch:
+      operationId: UpdateCategory
+      description: |-
+        GET    /api/v1/categories/{category_id}
+        PATCH  /api/v1/categories/{category_id}   (관리자)
+        DELETE /api/v1/categories/{category_id}   (관리자, 해당 카테고리에 상품 있으면 409)
+      parameters:
+      - in: path
+        name: category_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - categories
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedCategoryWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedCategoryWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedCategoryWriteRequest'
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+          description: ''
+    delete:
+      operationId: DeleteCategory
+      description: |-
+        GET    /api/v1/categories/{category_id}
+        PATCH  /api/v1/categories/{category_id}   (관리자)
+        DELETE /api/v1/categories/{category_id}   (관리자, 해당 카테고리에 상품 있으면 409)
+      parameters:
+      - in: path
+        name: category_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - categories
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '204':
+          description: No response body
+        '409':
+          description: No response body
+  /api/v1/orders/cancel-merged/:
+    post:
+      operationId: orders_cancel_merged_create
+      description: 통합된 주문을 취소하고 가능한 경우 원래 주문들을 복원합니다.
+      summary: 통합 주문 취소
+      tags:
+      - Orders
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CancelMergedOrderRequestRequest'
+            examples:
+              통합주문취소예시:
+                value:
+                  merged_order_id: 5fa85f64-5717-4562-b3fc-2c963f66afa8
+                summary: 통합 주문 취소 예시
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CancelMergedOrderRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CancelMergedOrderRequestRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  restored_orders:
+                    type: integer
+                  main_order_id:
+                    type: string
+                    format: uuid
+                  message:
+                    type: string
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+          description: ''
+  /api/v1/orders/checkout/:
+    post:
+      operationId: CheckoutV2
+      description: 장바구니 합계로 주문 헤더를 만들고 결제 스텁을 생성합니다.
+      summary: 체크아웃(헤더+결제 스텁)
+      tags:
+      - Orders
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/orders/delete-ready/:
+    post:
+      operationId: orders_delete_ready_create
+      description: 여러 개의 미결제(Ready) 상태 주문을 삭제하고 재고를 복구합니다.
+      summary: Ready 주문 일괄 삭제
+      tags:
+      - Orders
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteReadyOrdersRequestRequest'
+            examples:
+              Ready주문일괄삭제예시:
+                value:
+                  order_ids:
+                  - 3fa85f64-5717-4562-b3fc-2c963f66afa6
+                  - 4fa85f64-5717-4562-b3fc-2c963f66afa7
+                summary: Ready 주문 일괄 삭제 예시
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DeleteReadyOrdersRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DeleteReadyOrdersRequestRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted_orders:
+                    type: integer
+                  deleted_items:
+                    type: integer
+                  restored_stock:
+                    type: integer
+                  message:
+                    type: string
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+          description: ''
+  /api/v1/orders/delete-ready-single/:
+    post:
+      operationId: orders_delete_ready_single_create
+      description: 단일 미결제(Ready) 상태 주문을 삭제하고 재고를 복구합니다.
+      summary: Ready 주문 단일 삭제
+      tags:
+      - Orders
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteSingleReadyOrderRequestRequest'
+            examples:
+              Ready주문단일삭제예시:
+                value:
+                  order_id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+                summary: Ready 주문 단일 삭제 예시
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DeleteSingleReadyOrderRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DeleteSingleReadyOrderRequestRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted_orders:
+                    type: integer
+                  deleted_items:
+                    type: integer
+                  restored_stock:
+                    type: integer
+                  message:
+                    type: string
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+          description: ''
+  /api/v1/orders/merge/:
+    post:
+      operationId: orders_merge_create
+      description: 여러 개의 미결제 주문을 하나의 새로운 주문으로 통합하고 결제 스텁을 생성합니다.
+      summary: 주문 통합
+      tags:
+      - Orders
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MergeOrdersRequestRequest'
+            examples:
+              주문통합예시:
+                value:
+                  order_ids:
+                  - 3fa85f64-5717-4562-b3fc-2c963f66afa6
+                  - 4fa85f64-5717-4562-b3fc-2c963f66afa7
+                summary: 주문 통합 예시
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MergeOrdersRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MergeOrdersRequestRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  merged_order_id:
+                    type: string
+                    format: uuid
+                  payment_id:
+                    type: string
+                    format: uuid
+                  order_number:
+                    type: string
+                  total_amount:
+                    type: string
+                  merged_count:
+                    type: integer
+                  message:
+                    type: string
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+          description: ''
+  /api/v1/orders/order-items/{item_id}/:
+    get:
+      operationId: RetrieveOrderItem
+      description: GET /api/v1/orders/order-items/{item_id}/
+      parameters:
+      - in: path
+        name: item_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - orders
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderItemRead'
+          description: ''
+  /api/v1/orders/purchases/:
+    get:
+      operationId: ListPurchases
+      description: |-
+        GET  /api/v1/purchases        (관리자만, 필터/정렬/페이징)
+        POST /api/v1/purchases        (로그인 필요, 결제 성공으로 간주하여 구매 생성)
+      parameters:
+      - in: query
+        name: date_from
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: date_to
+        schema:
+          type: string
+          format: date-time
+      - name: ordering
+        required: false
+        in: query
+        description: 결과 정렬 시 사용할 필드.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: 페이지네이션된 결과 집합 내의 페이지 번호.
+        schema:
+          type: integer
+      - in: query
+        name: product_id
+        schema:
+          type: string
+          format: uuid
+      - name: size
+        required: false
+        in: query
+        description: 페이지당 반환할 결과 수.
+        schema:
+          type: integer
+      - in: query
+        name: status
+        schema:
+          type: string
+      - in: query
+        name: user_id
+        schema:
+          type: string
+          format: uuid
+      tags:
+      - orders
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedPurchaseReadList'
+          description: ''
+    post:
+      operationId: CreatePurchase
+      description: |-
+        GET  /api/v1/purchases        (관리자만, 필터/정렬/페이징)
+        POST /api/v1/purchases        (로그인 필요, 결제 성공으로 간주하여 구매 생성)
+      tags:
+      - orders
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PurchaseWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PurchaseWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PurchaseWriteRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseRead'
+          description: ''
+  /api/v1/orders/purchases/{purchase_id}/:
+    get:
+      operationId: orders_purchases_retrieve
+      description: GET /api/v1/purchases/{purchase_id}
+      parameters:
+      - in: path
+        name: purchase_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - orders
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseRead'
+          description: ''
+  /api/v1/orders/purchases/{purchase_id}/cancel/:
+    patch:
+      operationId: PurchaseCancel
+      summary: 주문 취소
+      parameters:
+      - in: path
+        name: purchase_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Orders
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseRead'
+          description: ''
+  /api/v1/orders/purchases/{purchase_id}/items/:
+    get:
+      operationId: ListOrderItemsByOrder
+      description: |-
+        GET /api/v1/orders/purchases/{purchase_id}/items/
+        - 본인 주문만 조회 가능(관리자는 전체)
+        - 필터: product_id, option_key
+      parameters:
+      - in: query
+        name: option_key
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: 페이지네이션된 결과 집합 내의 페이지 번호.
+        schema:
+          type: integer
+      - in: query
+        name: product_id
+        schema:
+          type: string
+      - in: path
+        name: purchase_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - name: size
+        required: false
+        in: query
+        description: 페이지당 반환할 결과 수.
+        schema:
+          type: integer
+      tags:
+      - orders
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedOrderItemReadList'
+          description: ''
+  /api/v1/orders/purchases/{purchase_id}/refund/:
+    patch:
+      operationId: PurchaseRefund
+      summary: 주문 환불
+      parameters:
+      - in: path
+        name: purchase_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Orders
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseRead'
+          description: ''
+  /api/v1/orders/purchases/{purchase_id}/shipping-address/:
+    patch:
+      operationId: orders_purchases_shipping_address_partial_update
+      description: |-
+        PATCH /api/v1/orders/purchases/{purchase_id}/shipping-address/
+        - 결제 전(ready) 주문만 변경 가능
+        body:
+          - {"address_id":"uuid"}  또는
+          - {"address":{...}}
+      parameters:
+      - in: path
+        name: purchase_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - orders
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/orders/purchases/bulk-shipping-address/:
+    patch:
+      operationId: orders_purchases_bulk_shipping_address_partial_update
+      description: |-
+        PATCH /api/v1/orders/purchases/bulk-shipping-address/
+        - 여러 ready 상태 주문에 한번에 배송지 지정
+        body:
+          - {"purchase_ids": ["uuid1", "uuid2"], "address_id": "uuid"}  또는
+          - {"purchase_ids": ["uuid1", "uuid2"], "address": {...}}
+      summary: 여러 주문 일괄 배송지 지정
+      tags:
+      - orders
+      requestBody:
+        content:
+          type:
+            schema:
+              type: object
+              additionalProperties: {}
+              description: Unspecified request body
+          properties:
+            schema:
+              purchase_ids:
+                type: array
+                items:
+                  type: string
+                  format: uuid
+                description: 배송지를 변경할 주문 ID 목록
+              address_id:
+                type: string
+                format: uuid
+                description: 등록된 배송지 ID (address와 중복 사용 불가)
+              address:
+                type: object
+                properties:
+                  recipient:
+                    type: string
+                  phone:
+                    type: string
+                  postcode:
+                    type: string
+                  address1:
+                    type: string
+                  address2:
+                    type: string
+                  memo:
+                    type: string
+                description: 새로운 배송지 정보 (address_id와 중복 사용 불가)
+          required:
+            schema:
+              type: object
+              additionalProperties: {}
+              description: Unspecified request body
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success_count:
+                    type: integer
+                  failed_count:
+                    type: integer
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        purchase_id:
+                          type: string
+                        status:
+                          type: string
+                          enum:
+                          - success
+                          - failed
+                        message:
+                          type: string
+          description: ''
+  /api/v1/orders/purchases/create/:
+    post:
+      operationId: CreatePurchaseOnly
+      tags:
+      - orders
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PurchaseWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PurchaseWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PurchaseWriteRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseRead'
+          description: ''
+  /api/v1/orders/purchases/me/:
+    get:
+      operationId: orders_purchases_me_list
+      description: GET /api/v1/purchases/me
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: 페이지네이션된 결과 집합 내의 페이지 번호.
+        schema:
+          type: integer
+      - name: size
+        required: false
+        in: query
+        description: 페이지당 반환할 결과 수.
+        schema:
+          type: integer
+      tags:
+      - orders
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedPurchaseReadList'
+          description: ''
+  /api/v1/orders/purchases/me/ready/:
+    get:
+      operationId: ListMyReadyPurchases
+      description: 현재 사용자의 결제 대기 중인 주문들만 조회합니다. order_id와 purchase_id가 동일한 값입니다.
+      summary: 내 결제 대기 주문 조회
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: 페이지네이션된 결과 집합 내의 페이지 번호.
+        schema:
+          type: integer
+      - name: size
+        required: false
+        in: query
+        description: 페이지당 반환할 결과 수.
+        schema:
+          type: integer
+      tags:
+      - Orders
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - count
+                - results
+                properties:
+                  count:
+                    type: integer
+                    example: 123
+                  next:
+                    type: string
+                    nullable: true
+                    format: uri
+                    example: http://api.example.org/accounts/?page=4
+                  previous:
+                    type: string
+                    nullable: true
+                    format: uri
+                    example: http://api.example.org/accounts/?page=2
+                  results:
+                    type: array
+                    items:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          purchase_id:
+                            type: string
+                            format: uuid
+                            description: 주문 ID (결제 API에서 orderId로 사용)
+                          order_id:
+                            type: string
+                            format: uuid
+                            description: 주문 ID (purchase_id와 동일)
+                          status:
+                            type: string
+                            description: 주문 상태 (ready)
+                          items_total:
+                            type: string
+                            description: 상품 총액 (결제 금액)
+                          purchased_at:
+                            type: string
+                            format: date-time
+                            description: 주문 생성 시간
+          description: ''
+  /api/v1/orders/purchases/update-all-ready-shipping-address/:
+    patch:
+      operationId: orders_purchases_update_all_ready_shipping_address_partial_update
+      description: |-
+        PATCH /api/v1/orders/purchases/update-all-ready-shipping-address/
+        - 현재 사용자의 모든 ready 상태 주문에 대해 배송지를 일괄 변경
+        - purchase_ids를 명시하지 않아도 됨 (자동으로 모든 ready 주문 대상)
+      summary: 현재 사용자의 모든 ready 주문 배송지 일괄 변경
+      tags:
+      - Orders
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                address_id:
+                  type: string
+                  format: uuid
+                  description: 등록된 배송지 ID (address와 중복 사용 불가)
+                address:
+                  type: object
+                  properties:
+                    recipient:
+                      type: string
+                    phone:
+                      type: string
+                    postcode:
+                      type: string
+                    address1:
+                      type: string
+                    address2:
+                      type: string
+                    memo:
+                      type: string
+                  description: 새로운 배송지 정보 (address_id와 중복 사용 불가)
+                memo:
+                  type: string
+                  description: 배송 메모 (선택사항)
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success_count:
+                    type: integer
+                  failed_count:
+                    type: integer
+                  updated_purchase_ids:
+                    type: array
+                    items:
+                      type: string
+                      format: uuid
+                  message:
+                    type: string
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+          description: ''
+  /api/v1/orders/ready-summary/:
+    get:
+      operationId: orders_ready_summary_retrieve
+      description: 사용자의 미결제(ready) 상태 주문들의 요약 정보를 조회합니다.
+      summary: 미결제 주문 요약
+      tags:
+      - Orders
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_orders:
+                    type: integer
+                    description: 총 미결제 주문 수
+                  total_amount:
+                    type: string
+                    description: 총 금액
+                  can_merge:
+                    type: boolean
+                    description: 통합 가능 여부
+                  orders:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        order_id:
+                          type: string
+                          format: uuid
+                        amount:
+                          type: string
+                        items_count:
+                          type: integer
+                        created_at:
+                          type: string
+                          format: date-time
+                        order_name:
+                          type: string
+          description: ''
+  /api/v1/payments/toss/{payment_id}/:
+    get:
+      operationId: PaymentRetrieve
+      parameters:
+      - in: path
+        name: payment_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - payments
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentRead'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/payments/toss/{payment_id}/cancel/:
+    post:
+      operationId: TossCancel
+      parameters:
+      - in: path
+        name: payment_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - payments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentCancelRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PaymentCancelRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PaymentCancelRequestRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentRead'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/payments/toss/{payment_id}/sync/:
+    post:
+      operationId: TossSync
+      parameters:
+      - in: path
+        name: payment_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - payments
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentRead'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/payments/toss/confirm/:
+    post:
+      operationId: TossConfirm
+      tags:
+      - payments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TossConfirmRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TossConfirmRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TossConfirmRequestRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentRead'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/product-stocks/:
+    get:
+      operationId: ListProductStocks
+      parameters:
+      - in: query
+        name: option_key
+        schema:
+          type: string
+      - name: ordering
+        required: false
+        in: query
+        description: 결과 정렬 시 사용할 필드.
+        schema:
+          type: string
+      - in: query
+        name: product_id
+        schema:
+          type: string
+          format: uuid
+      tags:
+      - product-stocks
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProductStockRead'
+          description: ''
+    post:
+      operationId: CreateProductStock
+      tags:
+      - product-stocks
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductStockWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ProductStockWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProductStockWriteRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductStockRead'
+          description: ''
+  /api/v1/product-stocks/{id}/:
+    get:
+      operationId: product_stocks_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: product stock을 식별하는 UUID 문자열.
+        required: true
+      tags:
+      - product-stocks
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductStockRead'
+          description: ''
+    put:
+      operationId: product_stocks_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: product stock을 식별하는 UUID 문자열.
+        required: true
+      tags:
+      - product-stocks
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductStockWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ProductStockWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProductStockWriteRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductStockWrite'
+          description: ''
+    patch:
+      operationId: product_stocks_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: product stock을 식별하는 UUID 문자열.
+        required: true
+      tags:
+      - product-stocks
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedProductStockWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedProductStockWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedProductStockWriteRequest'
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductStockWrite'
+          description: ''
+    delete:
+      operationId: product_stocks_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: product stock을 식별하는 UUID 문자열.
+        required: true
+      tags:
+      - product-stocks
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/products/:
+    get:
+      operationId: ListProducts
+      parameters:
+      - in: query
+        name: category_id
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: is_active
+        schema:
+          type: boolean
+      - in: query
+        name: max_price
+        schema:
+          type: number
+      - in: query
+        name: min_price
+        schema:
+          type: number
+      - in: query
+        name: ordering
+        schema:
+          type: string
+        description: '정렬: name, price, created_at (내림차순은 -price 형식)'
+      - name: page
+        required: false
+        in: query
+        description: 페이지네이션된 결과 집합 내의 페이지 번호.
+        schema:
+          type: integer
+      - in: query
+        name: q
+        schema:
+          type: string
+        description: 이름/설명 검색
+      - name: size
+        required: false
+        in: query
+        description: 페이지당 반환할 결과 수.
+        schema:
+          type: integer
+      tags:
+      - products
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProductReadList'
+          description: ''
+    post:
+      operationId: CreateProduct
+      tags:
+      - products
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ProductWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProductWriteRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductRead'
+          description: ''
+  /api/v1/products/{product_id}/:
+    get:
+      operationId: RetrieveProduct
+      parameters:
+      - in: path
+        name: product_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - products
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductRead'
+          description: ''
+    patch:
+      operationId: UpdateProduct
+      parameters:
+      - in: path
+        name: product_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - products
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedProductWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedProductWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedProductWriteRequest'
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductRead'
+          description: ''
+    delete:
+      operationId: DeleteProduct
+      parameters:
+      - in: path
+        name: product_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - products
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/products/{product_id}/images/:
+    get:
+      operationId: ListProductImages
+      description: |-
+        상품의 이미지 리스트를 공개로 반환.
+        응답: ProductImageSlim[]
+      parameters:
+      - in: path
+        name: product_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - products
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProductImageSlim'
+          description: ''
+  /api/v1/products/{product_id}/reviews/:
+    get:
+      operationId: products_reviews_list
+      description: |-
+        GET  /api/v1/products/{product_id}/reviews
+        POST /api/v1/products/{product_id}/reviews  (구매자만)
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: 페이지네이션된 결과 집합 내의 페이지 번호.
+        schema:
+          type: integer
+      - in: path
+        name: product_id
+        schema:
+          type: string
+          format: uuid
+        description: 상품 ID (UUID)
+        required: true
+      - name: size
+        required: false
+        in: query
+        description: 페이지당 반환할 결과 수.
+        schema:
+          type: integer
+      tags:
+      - products
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedReviewReadList'
+          description: ''
+    post:
+      operationId: CreateProductReview
+      description: |-
+        GET  /api/v1/products/{product_id}/reviews
+        POST /api/v1/products/{product_id}/reviews  (구매자만)
+      parameters:
+      - in: path
+        name: product_id
+        schema:
+          type: string
+          format: uuid
+        description: 상품 ID (UUID)
+        required: true
+      tags:
+      - products
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ReviewWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ReviewWriteRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewRead'
+          description: ''
+  /api/v1/reviews/{review_id}/:
+    get:
+      operationId: GetReview
+      description: GET/PATCH/DELETE /api/v1/reviews/{review_id}
+      parameters:
+      - in: path
+        name: review_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - products
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewRead'
+          description: ''
+    patch:
+      operationId: UpdateReview
+      description: GET/PATCH/DELETE /api/v1/reviews/{review_id}
+      parameters:
+      - in: path
+        name: review_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - products
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedReviewWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedReviewWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedReviewWriteRequest'
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewWrite'
+          description: ''
+    delete:
+      operationId: DeleteReview
+      description: GET/PATCH/DELETE /api/v1/reviews/{review_id}
+      parameters:
+      - in: path
+        name: review_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - products
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/shipments/:
+    get:
+      operationId: shipments_list
+      parameters:
+      - in: query
+        name: order_id
+        schema:
+          type: string
+        description: filter shipments by order ID
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: page number (1-base)
+      - in: query
+        name: size
+        schema:
+          type: integer
+        description: page size
+      tags:
+      - shipments
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Shipment'
+          description: ''
+  /api/v1/shipments/{id}/:
+    get:
+      operationId: shipments_retrieve
+      description: id는 UUID가 기본. (urls에 문자열 백업 라우트도 있음)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - shipments
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Shipment'
+          description: ''
+  /api/v1/shipments/register/:
+    post:
+      operationId: shipments_register_create
+      tags:
+      - shipments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterShipmentRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Shipment'
+          description: ''
+  /api/v1/shipments/shipments/track/:
+    get:
+      operationId: shipments_shipments_track_retrieve
+      tags:
+      - shipments
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/shipments/sync/:
+    post:
+      operationId: shipments_sync_create
+      tags:
+      - shipments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookInRequest'
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/shipments/webhooks/{carrier}/:
+    post:
+      operationId: shipments_webhooks_create
+      parameters:
+      - in: path
+        name: carrier
+        schema:
+          type: string
+        required: true
+      tags:
+      - shipments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookInRequest'
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/users/me/:
+    get:
+      operationId: GetMe
+      description: |-
+        GET    /api/v1/users/me/      내 프로필 조회
+        PATCH  /api/v1/users/me/      이름/닉네임/전화/주소 수정 & (옵션) 비밀번호 변경
+        DELETE /api/v1/users/me/      소프트 삭제(status=deleted, is_active=False)
+      tags:
+      - users
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Me'
+          description: ''
+    patch:
+      operationId: UpdateMe
+      description: |-
+        GET    /api/v1/users/me/      내 프로필 조회
+        PATCH  /api/v1/users/me/      이름/닉네임/전화/주소 수정 & (옵션) 비밀번호 변경
+        DELETE /api/v1/users/me/      소프트 삭제(status=deleted, is_active=False)
+      tags:
+      - users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedMeUpdateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedMeUpdateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedMeUpdateRequest'
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Me'
+          description: ''
+    delete:
+      operationId: DeleteMe
+      description: |-
+        GET    /api/v1/users/me/      내 프로필 조회
+        PATCH  /api/v1/users/me/      이름/닉네임/전화/주소 수정 & (옵션) 비밀번호 변경
+        DELETE /api/v1/users/me/      소프트 삭제(status=deleted, is_active=False)
+      tags:
+      - users
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/users/me/addresses/:
+    get:
+      operationId: users_me_addresses_list
+      tags:
+      - users
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserAddressRead'
+          description: ''
+    post:
+      operationId: users_me_addresses_create
+      tags:
+      - users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserAddressWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserAddressWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserAddressWriteRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserAddressWrite'
+          description: ''
+  /api/v1/users/me/addresses/{address_id}/:
+    get:
+      operationId: users_me_addresses_retrieve
+      parameters:
+      - in: path
+        name: address_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - users
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserAddressRead'
+          description: ''
+    put:
+      operationId: users_me_addresses_update
+      parameters:
+      - in: path
+        name: address_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserAddressWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserAddressWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserAddressWriteRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserAddressWrite'
+          description: ''
+    patch:
+      operationId: users_me_addresses_partial_update
+      parameters:
+      - in: path
+        name: address_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUserAddressWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUserAddressWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUserAddressWriteRequest'
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserAddressWrite'
+          description: ''
+    delete:
+      operationId: users_me_addresses_destroy
+      parameters:
+      - in: path
+        name: address_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - users
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/users/me/addresses/{address_id}/set-default/:
+    post:
+      operationId: users_me_addresses_set_default_create
+      parameters:
+      - in: path
+        name: address_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - users
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/users/me/social-accounts/:
+    get:
+      operationId: users_me_social_accounts_list
+      description: GET /api/v1/users/me/social-accounts/
+      tags:
+      - users
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SocialAccount'
+          description: ''
+  /api/v1/users/me/social-accounts/{social_id}/:
+    delete:
+      operationId: users_me_social_accounts_destroy
+      description: DELETE /api/v1/users/me/social-accounts/{social_id}/
+      parameters:
+      - in: path
+        name: social_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - users
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/webhooks/shipments/{carrier}/:
+    post:
+      operationId: webhooks_shipments_create
+      parameters:
+      - in: path
+        name: carrier
+        schema:
+          type: string
+        required: true
+      tags:
+      - webhooks
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookInRequest'
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/wishlist/items/:
+    get:
+      operationId: wishlist_items_list
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: 결과 정렬 시 사용할 필드.
+        schema:
+          type: string
+      - name: search
+        required: false
+        in: query
+        description: 검색어.
+        schema:
+          type: string
+      tags:
+      - wishlist
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WishlistItemRead'
+          description: ''
+    post:
+      operationId: wishlist_items_create
+      tags:
+      - wishlist
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WishlistItemWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/WishlistItemWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/WishlistItemWriteRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WishlistItemWrite'
+          description: ''
+  /api/v1/wishlist/items/{id}/:
+    delete:
+      operationId: wishlist_items_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - wishlist
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/wishlist/items/{id}/move-to-cart/:
+    post:
+      operationId: wishlist_items_move_to_cart_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - wishlist
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MoveToCartRequestRequest'
+            examples:
+              기본사용:
+                value:
+                  quantity: 1
+                  remove_from_wishlist: true
+                summary: 기본 사용
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MoveToCartRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MoveToCartRequestRequest'
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartItem'
+          description: ''
+components:
+  schemas:
+    AddCartItemRequest:
+      type: object
+      description: |-
+        장바구니에 아이템 추가
+        - product 또는 product_id 중 하나는 필수
+        - 아래 중 하나만 보내세요:
+          1) option_key: "size=L&color=red"
+          2) options: {"size":"L", "color":"red"}
+        - 둘 다 비우면 '옵션 없음'
+      properties:
+        product:
+          type: string
+          minLength: 1
+        product_id:
+          type: string
+          minLength: 1
+        quantity:
+          type: integer
+          minimum: 1
+          default: 1
+        option_key:
+          type: string
+        options: {}
+    BlankEnum:
+      enum:
+      - ''
+    CancelMergedOrderRequestRequest:
+      type: object
+      description: 통합 주문 취소 요청 시리얼라이저
+      properties:
+        merged_order_id:
+          type: string
+          format: uuid
+          description: 취소할 통합 주문 ID
+      required:
+      - merged_order_id
+    Cart:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        user:
+          type: string
+          format: uuid
+          readOnly: true
+        expires_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CartItem'
+          readOnly: true
+        items_total:
+          type: string
+          readOnly: true
+        item_count:
+          type: integer
+          readOnly: true
+      required:
+      - expires_at
+      - id
+      - item_count
+      - items
+      - items_total
+      - updated_at
+      - user
+    CartItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        product:
+          type: string
+          format: uuid
+        product_name:
+          type: string
+          readOnly: true
+        option_key:
+          type: string
+          readOnly: true
+          description: '예: size=L&color=BLACK (URL-encoded 권장)'
+        options: {}
+        quantity:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+        unit_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+        image_url:
+          type: string
+          nullable: true
+          readOnly: true
+        added_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - added_at
+      - id
+      - image_url
+      - option_key
+      - product
+      - product_name
+      - unit_price
+    Category:
+      type: object
+      properties:
+        category_id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+      required:
+      - category_id
+      - name
+    CategoryAdmin:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        parent:
+          type: string
+          format: uuid
+          nullable: true
+        level:
+          allOf:
+          - $ref: '#/components/schemas/LevelEnum'
+          readOnly: true
+        path:
+          type: string
+          readOnly: true
+        children_count:
+          type: integer
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - children_count
+      - created_at
+      - id
+      - level
+      - name
+      - path
+      - updated_at
+    CategoryAdminRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        parent:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+      - name
+    CategoryRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+      required:
+      - name
+    CategoryWriteRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+      required:
+      - name
+    DeleteReadyOrdersRequestRequest:
+      type: object
+      description: Ready 주문 삭제 요청 시리얼라이저
+      properties:
+        order_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: 삭제할 Ready 상태 주문 ID 목록
+          minItems: 1
+      required:
+      - order_ids
+    DeleteSingleReadyOrderRequestRequest:
+      type: object
+      description: 단일 Ready 주문 삭제 요청 시리얼라이저
+      properties:
+        order_id:
+          type: string
+          format: uuid
+          description: 삭제할 Ready 상태 주문 ID
+      required:
+      - order_id
+    EmailTokenObtainPairRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          writeOnly: true
+          minLength: 1
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+      required:
+      - email
+      - password
+    LastEventStatusEnum:
+      enum:
+      - pending
+      - in_transit
+      - out_for_delivery
+      - delivered
+      - canceled
+      - returned
+      type: string
+      description: |-
+        * `pending` - Pending
+        * `in_transit` - In Transit
+        * `out_for_delivery` - Out For Delivery
+        * `delivered` - Delivered
+        * `canceled` - Canceled
+        * `returned` - Returned
+    LevelEnum:
+      enum:
+      - l1
+      - l2
+      - l3
+      type: string
+      description: |-
+        * `l1` - 대분류
+        * `l2` - 중분류
+        * `l3` - 소분류
+    LoginRequestRequest:
+      type: object
+      description: email 또는 username + password 허용
+      properties:
+        email:
+          type: string
+          format: email
+        username:
+          type: string
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+      required:
+      - password
+    Me:
+      type: object
+      description: 내 정보 조회용 (GET /users/me) — 안전한 필드만 노출
+      properties:
+        user_id:
+          type: string
+          format: uuid
+          readOnly: true
+        email:
+          type: string
+          format: email
+          readOnly: true
+        username:
+          type: string
+          readOnly: true
+          title: 사용자 이름
+          description: 150자 이하 문자, 숫자 그리고 @/./+/-/_만 가능합니다.
+        name:
+          type: string
+          nullable: true
+          readOnly: true
+        nickname:
+          type: string
+          readOnly: true
+        phone_number:
+          type: string
+          readOnly: true
+        address:
+          type: string
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/Status84aEnum'
+          readOnly: true
+        is_active:
+          type: boolean
+          readOnly: true
+          title: 활성
+          description: 이 사용자가 활성화되어 있는지를 나타냅니다. 계정을 삭제하는 대신 이것을 선택 해제하세요.
+        role:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - address
+      - created_at
+      - email
+      - is_active
+      - name
+      - nickname
+      - phone_number
+      - role
+      - status
+      - updated_at
+      - user_id
+      - username
+    MergeOrdersRequestRequest:
+      type: object
+      description: 주문 통합 요청 시리얼라이저
+      properties:
+        order_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: 통합할 주문 ID 목록 (최소 2개)
+          minItems: 2
+      required:
+      - order_ids
+    MethodEnum:
+      enum:
+      - card
+      type: string
+      description: '* `card` - Card'
+    MoveToCartRequestRequest:
+      type: object
+      properties:
+        quantity:
+          type: integer
+          minimum: 1
+          default: 1
+        remove_from_wishlist:
+          type: boolean
+          default: true
+    NullEnum:
+      enum:
+      - null
+    OrderActionResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+      required:
+      - id
+      - status
+    OrderItemRead:
+      type: object
+      properties:
+        item_id:
+          type: string
+          format: uuid
+          readOnly: true
+        order_id:
+          type: string
+          format: uuid
+          readOnly: true
+        product_id:
+          type: string
+          format: uuid
+          readOnly: true
+        product_name:
+          type: string
+          readOnly: true
+        thumbnail_url:
+          type: string
+          readOnly: true
+          nullable: true
+        sku:
+          type: string
+          readOnly: true
+          nullable: true
+        option_key:
+          type: string
+          readOnly: true
+        options:
+          readOnly: true
+        unit_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          readOnly: true
+        quantity:
+          type: integer
+          readOnly: true
+        line_discount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          readOnly: true
+        line_tax:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          readOnly: true
+        currency:
+          type: string
+          readOnly: true
+        line_total:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - currency
+      - item_id
+      - line_discount
+      - line_tax
+      - line_total
+      - option_key
+      - options
+      - order_id
+      - product_id
+      - product_name
+      - quantity
+      - sku
+      - thumbnail_url
+      - unit_price
+      - updated_at
+    PaginatedOrderItemReadList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItemRead'
+    PaginatedProductReadList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductRead'
+    PaginatedPurchaseReadList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/PurchaseRead'
+    PaginatedReviewReadList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReviewRead'
+    PatchedCategoryAdminRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        parent:
+          type: string
+          format: uuid
+          nullable: true
+    PatchedCategoryWriteRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+    PatchedMeUpdateRequest:
+      type: object
+      description: |-
+        내 정보 수정용 (PATCH /users/me)
+        - name -> first_name 로 매핑
+        - 비밀번호 변경(current/new) 옵션
+      properties:
+        name:
+          type: string
+          maxLength: 150
+        nickname:
+          type: string
+          maxLength: 150
+        phone_number:
+          type: string
+          maxLength: 50
+        address:
+          type: string
+        current_password:
+          type: string
+          writeOnly: true
+          minLength: 1
+        new_password:
+          type: string
+          writeOnly: true
+          minLength: 8
+          maxLength: 16
+    PatchedProductAdminRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+        category:
+          type: string
+          format: uuid
+          nullable: true
+        options: {}
+        is_active:
+          type: boolean
+    PatchedProductStockAdminRequest:
+      type: object
+      properties:
+        product:
+          type: string
+          format: uuid
+        option_key:
+          type: string
+          default: ''
+          maxLength: 64
+        options: {}
+        stock_quantity:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+    PatchedProductStockWriteRequest:
+      type: object
+      properties:
+        product_id:
+          type: string
+          format: uuid
+        option_key:
+          type: string
+          nullable: true
+          default: ''
+        options: {}
+        stock_quantity:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+    PatchedProductWriteRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+        is_active:
+          type: boolean
+        options: {}
+        category_id:
+          type: string
+          format: uuid
+          nullable: true
+    PatchedReviewWriteRequest:
+      type: object
+      description: |-
+        생성(POST)과 부분수정(PATCH) 공용 Serializer.
+        - 입력 필드는 rating, content 만 받는다.
+        - user/product_id는 뷰/컨텍스트 기반으로 내부에서 주입한다.
+      properties:
+        rating:
+          type: integer
+          maximum: 5
+          minimum: 1
+        content:
+          type: string
+    PatchedUpdateCartItemRequest:
+      type: object
+      description: 장바구니 아이템 수량 및 옵션 변경용 시리얼라이저
+      properties:
+        quantity:
+          type: integer
+          minimum: 1
+        option_key:
+          type: string
+          default: ''
+        options: {}
+    PatchedUpdateCartQtyRequest:
+      type: object
+      description: 장바구니 아이템 수량 변경용 시리얼라이저
+      properties:
+        quantity:
+          type: integer
+          minimum: 1
+    PatchedUserAddressWriteRequest:
+      type: object
+      properties:
+        recipient:
+          type: string
+          minLength: 1
+          maxLength: 50
+        phone:
+          type: string
+          minLength: 1
+          maxLength: 20
+        postcode:
+          type: string
+          minLength: 1
+          maxLength: 10
+        address1:
+          type: string
+          minLength: 1
+          maxLength: 200
+        address2:
+          type: string
+          maxLength: 200
+        is_default:
+          type: boolean
+        is_active:
+          type: boolean
+    PatchedUserRoleUpdateRequest:
+      type: object
+      properties:
+        role:
+          $ref: '#/components/schemas/UserRoleUpdateRoleEnum'
+    PaymentCancelRequestRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+        cancel_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+        tax_free_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          default: '0.00'
+        order_item_id:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+      - cancel_amount
+    PaymentRead:
+      type: object
+      properties:
+        payment_id:
+          type: string
+          format: uuid
+          readOnly: true
+        order_id:
+          type: string
+          format: uuid
+          readOnly: true
+        order_number:
+          type: string
+          nullable: true
+          maxLength: 100
+        status:
+          $ref: '#/components/schemas/PaymentReadStatusEnum'
+        amount_total:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+        vat:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+        method:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/MethodEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        provider:
+          $ref: '#/components/schemas/PaymentReadProviderEnum'
+        provider_payment_key:
+          type: string
+          nullable: true
+          maxLength: 200
+        approved_at:
+          type: string
+          format: date-time
+          nullable: true
+        canceled_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+      - order_id
+      - payment_id
+    PaymentReadProviderEnum:
+      enum:
+      - toss
+      type: string
+      description: '* `toss` - Toss'
+    PaymentReadStatusEnum:
+      enum:
+      - ready
+      - paid
+      - canceled
+      type: string
+      description: |-
+        * `ready` - Ready
+        * `paid` - Paid
+        * `canceled` - Canceled
+    ProductAdmin:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+        category:
+          type: string
+          format: uuid
+          nullable: true
+        category_path:
+          type: string
+          nullable: true
+          readOnly: true
+        options: {}
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - category_path
+      - created_at
+      - id
+      - name
+      - price
+      - updated_at
+    ProductAdminRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+        category:
+          type: string
+          format: uuid
+          nullable: true
+        options: {}
+        is_active:
+          type: boolean
+      required:
+      - name
+      - price
+    ProductImageAdmin:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        product:
+          type: string
+          format: uuid
+        stock:
+          type: string
+          format: uuid
+          nullable: true
+        image:
+          type: string
+          format: uri
+          nullable: true
+        remote_url:
+          type: string
+          format: uri
+          nullable: true
+          maxLength: 200
+        is_remote:
+          type: boolean
+        file_url:
+          type: string
+          readOnly: true
+        image_url:
+          type: string
+          readOnly: true
+        alt_text:
+          type: string
+          maxLength: 255
+        caption:
+          type: string
+          maxLength: 255
+        is_main:
+          type: boolean
+        display_order:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        product_name:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - file_url
+      - id
+      - image_url
+      - product
+      - product_name
+      - updated_at
+    ProductImageSlim:
+      type: object
+      description: |-
+        모델명을 모르거나 related_name이 불확실한 상황을 위해
+        순수 Serializer로 슬림 구조만 내려준다.
+        - 이미지 없으면 url=None (프론트가 안전하게 분기 가능)
+      properties:
+        id:
+          type: string
+        url:
+          type: string
+          nullable: true
+      required:
+      - id
+      - url
+    ProductImagesUploadRequest:
+      type: object
+      properties:
+        images:
+          type: array
+          items:
+            type: string
+            format: binary
+        image_urls:
+          type: array
+          items:
+            type: string
+            format: uri
+            minLength: 1
+        save_remote:
+          type: boolean
+          default: false
+        main_index:
+          type: integer
+          default: -1
+          description: 대표로 지정할 업로드 파일 인덱스(0부터)
+        replace_main:
+          type: boolean
+          default: false
+        start_order:
+          type: integer
+          default: 0
+        alt_texts:
+          type: array
+          items:
+            type: string
+        captions:
+          type: array
+          items:
+            type: string
+    ProductRead:
+      type: object
+      properties:
+        product_id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+        is_active:
+          type: boolean
+        options: {}
+        category_id:
+          type: string
+          format: uuid
+          readOnly: true
+        category_name:
+          type: string
+          readOnly: true
+        primary_image:
+          allOf:
+          - $ref: '#/components/schemas/ProductImageSlim'
+          readOnly: true
+        images:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductImageSlim'
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - category_id
+      - category_name
+      - created_at
+      - images
+      - name
+      - price
+      - primary_image
+      - product_id
+      - updated_at
+    ProductStockAdmin:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        product:
+          type: string
+          format: uuid
+        product_name:
+          type: string
+          readOnly: true
+        option_key:
+          type: string
+          default: ''
+          maxLength: 64
+        options: {}
+        stock_quantity:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - product
+      - product_name
+      - updated_at
+    ProductStockAdminRequest:
+      type: object
+      properties:
+        product:
+          type: string
+          format: uuid
+        option_key:
+          type: string
+          default: ''
+          maxLength: 64
+        options: {}
+        stock_quantity:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+      required:
+      - product
+    ProductStockRead:
+      type: object
+      properties:
+        stock_id:
+          type: string
+          format: uuid
+          readOnly: true
+        product_id:
+          type: string
+          format: uuid
+          readOnly: true
+        option_key:
+          type: string
+          maxLength: 64
+        options: {}
+        stock_quantity:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - product_id
+      - stock_id
+      - updated_at
+    ProductStockWrite:
+      type: object
+      properties:
+        product_id:
+          type: string
+          format: uuid
+        option_key:
+          type: string
+          nullable: true
+          default: ''
+        options: {}
+        stock_quantity:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+      required:
+      - product_id
+    ProductStockWriteRequest:
+      type: object
+      properties:
+        product_id:
+          type: string
+          format: uuid
+        option_key:
+          type: string
+          nullable: true
+          default: ''
+        options: {}
+        stock_quantity:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+      required:
+      - product_id
+    ProductWriteRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+        is_active:
+          type: boolean
+        options: {}
+        category_id:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+      - name
+      - price
+    PurchaseAdmin:
+      type: object
+      properties:
+        purchase_id:
+          type: string
+          format: uuid
+          readOnly: true
+        user:
+          type: string
+          format: uuid
+        user_email:
+          type: string
+          format: email
+          readOnly: true
+        status:
+          $ref: '#/components/schemas/Status4abEnum'
+        purchased_at:
+          type: string
+          format: date-time
+          readOnly: true
+        pg:
+          type: string
+          nullable: true
+          maxLength: 20
+        pg_tid:
+          type: string
+          nullable: true
+          maxLength: 100
+        amount:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+      required:
+      - purchase_id
+      - purchased_at
+      - user
+      - user_email
+    PurchaseRead:
+      type: object
+      properties:
+        purchase_id:
+          type: string
+          format: uuid
+          readOnly: true
+        user:
+          type: string
+          format: uuid
+        product:
+          type: string
+          format: uuid
+          nullable: true
+        product_name:
+          type: string
+          readOnly: true
+        amount:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+        unit_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+        options: {}
+        option_key:
+          type: string
+          maxLength: 64
+        items_total:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+        status:
+          allOf:
+          - $ref: '#/components/schemas/Status4abEnum'
+          readOnly: true
+        purchased_at:
+          type: string
+          format: date-time
+          readOnly: true
+        pg:
+          type: string
+          nullable: true
+          maxLength: 20
+        pg_tid:
+          type: string
+          nullable: true
+          maxLength: 100
+      required:
+      - product_name
+      - purchase_id
+      - purchased_at
+      - status
+      - user
+    PurchaseWriteRequest:
+      type: object
+      properties:
+        user:
+          type: string
+          format: uuid
+        product:
+          type: string
+          format: uuid
+          nullable: true
+        amount:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+        unit_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+        options: {}
+        option_key:
+          type: string
+          maxLength: 64
+        pg:
+          type: string
+          nullable: true
+          maxLength: 20
+        pg_tid:
+          type: string
+          nullable: true
+          maxLength: 100
+      required:
+      - user
+    RegisterRequest:
+      type: object
+      description: '회원가입: username이 없으면 이메일 기반으로 자동 생성'
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+          maxLength: 254
+        username:
+          type: string
+        password:
+          type: string
+          writeOnly: true
+          minLength: 8
+          maxLength: 16
+        nickname:
+          type: string
+          maxLength: 150
+        phone_number:
+          type: string
+          maxLength: 50
+        address:
+          type: string
+      required:
+      - email
+      - password
+    RegisterShipmentRequest:
+      type: object
+      properties:
+        purchase_id:
+          type: string
+          format: uuid
+        tracking_number:
+          type: string
+          minLength: 1
+          maxLength: 64
+        carrier:
+          type: string
+        carrier_code:
+          type: string
+      required:
+      - purchase_id
+      - tracking_number
+    ReviewRead:
+      type: object
+      properties:
+        review_id:
+          type: string
+          format: uuid
+          readOnly: true
+        user_id:
+          type: string
+          format: uuid
+          readOnly: true
+        product_id:
+          type: string
+          format: uuid
+          readOnly: true
+        rating:
+          type: integer
+          maximum: 32767
+          minimum: 0
+        content:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - product_id
+      - rating
+      - review_id
+      - user_id
+    ReviewWrite:
+      type: object
+      description: |-
+        생성(POST)과 부분수정(PATCH) 공용 Serializer.
+        - 입력 필드는 rating, content 만 받는다.
+        - user/product_id는 뷰/컨텍스트 기반으로 내부에서 주입한다.
+      properties:
+        rating:
+          type: integer
+          maximum: 5
+          minimum: 1
+        content:
+          type: string
+      required:
+      - rating
+    ReviewWriteRequest:
+      type: object
+      description: |-
+        생성(POST)과 부분수정(PATCH) 공용 Serializer.
+        - 입력 필드는 rating, content 만 받는다.
+        - user/product_id는 뷰/컨텍스트 기반으로 내부에서 주입한다.
+      properties:
+        rating:
+          type: integer
+          maximum: 5
+          minimum: 1
+        content:
+          type: string
+      required:
+      - rating
+    Shipment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        carrier:
+          type: string
+          maxLength: 40
+        tracking_number:
+          type: string
+          maxLength: 64
+        status:
+          $ref: '#/components/schemas/StatusAf2Enum'
+        shipped_at:
+          type: string
+          format: date-time
+          nullable: true
+        delivered_at:
+          type: string
+          format: date-time
+          nullable: true
+        canceled_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_event_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_event_status:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/LastEventStatusEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        last_event_loc:
+          type: string
+          maxLength: 120
+        last_event_desc:
+          type: string
+          maxLength: 200
+        last_synced_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - carrier
+      - created_at
+      - id
+      - tracking_number
+      - updated_at
+    SocialAccount:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        provider:
+          allOf:
+          - $ref: '#/components/schemas/SocialAccountProviderEnum'
+          readOnly: true
+        provider_uid:
+          type: string
+          readOnly: true
+        email:
+          type: string
+          format: email
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - email
+      - id
+      - provider
+      - provider_uid
+    SocialAccountProviderEnum:
+      enum:
+      - google
+      - naver
+      - kakao
+      type: string
+      description: |-
+        * `google` - Google
+        * `naver` - Naver
+        * `kakao` - Kakao
+    Status4abEnum:
+      enum:
+      - ready
+      - paid
+      - canceled
+      - refunded
+      - merged
+      type: string
+      description: |-
+        * `ready` - Ready
+        * `paid` - Paid
+        * `canceled` - Canceled
+        * `refunded` - Refunded
+        * `merged` - Merged
+    Status84aEnum:
+      enum:
+      - active
+      - inactive
+      - deleted
+      type: string
+      description: |-
+        * `active` - Active
+        * `inactive` - Inactive
+        * `deleted` - Deleted
+    StatusAf2Enum:
+      enum:
+      - pending
+      - in_transit
+      - out_for_delivery
+      - delivered
+      - canceled
+      - returned
+      type: string
+      description: |-
+        * `pending` - Pending
+        * `in_transit` - In Transit
+        * `out_for_delivery` - Out For Delivery
+        * `delivered` - Delivered
+        * `canceled` - Canceled
+        * `returned` - Returned
+    TokenPairResponse:
+      type: object
+      description: access + refresh 동시 응답용 (스키마 문서화)
+      properties:
+        access:
+          type: string
+        refresh:
+          type: string
+      required:
+      - access
+      - refresh
+    TokenRefresh:
+      type: object
+      properties:
+        access:
+          type: string
+          readOnly: true
+        refresh:
+          type: string
+      required:
+      - access
+      - refresh
+    TokenRefreshRequest:
+      type: object
+      properties:
+        refresh:
+          type: string
+          minLength: 1
+      required:
+      - refresh
+    TossConfirmRequestRequest:
+      type: object
+      properties:
+        paymentKey:
+          type: string
+          minLength: 1
+          maxLength: 200
+        orderId:
+          type: string
+          minLength: 1
+          maxLength: 100
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+      required:
+      - amount
+      - orderId
+      - paymentKey
+    UserAddressRead:
+      type: object
+      properties:
+        address_id:
+          type: string
+          format: uuid
+          readOnly: true
+        recipient:
+          type: string
+          maxLength: 50
+        phone:
+          type: string
+          maxLength: 20
+        postcode:
+          type: string
+          maxLength: 10
+        address1:
+          type: string
+          maxLength: 200
+        address2:
+          type: string
+          maxLength: 200
+        is_default:
+          type: boolean
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - address1
+      - address_id
+      - created_at
+      - phone
+      - postcode
+      - recipient
+      - updated_at
+    UserAddressWrite:
+      type: object
+      properties:
+        recipient:
+          type: string
+          maxLength: 50
+        phone:
+          type: string
+          maxLength: 20
+        postcode:
+          type: string
+          maxLength: 10
+        address1:
+          type: string
+          maxLength: 200
+        address2:
+          type: string
+          maxLength: 200
+        is_default:
+          type: boolean
+        is_active:
+          type: boolean
+      required:
+      - address1
+      - phone
+      - postcode
+      - recipient
+    UserAddressWriteRequest:
+      type: object
+      properties:
+        recipient:
+          type: string
+          minLength: 1
+          maxLength: 50
+        phone:
+          type: string
+          minLength: 1
+          maxLength: 20
+        postcode:
+          type: string
+          minLength: 1
+          maxLength: 10
+        address1:
+          type: string
+          minLength: 1
+          maxLength: 200
+        address2:
+          type: string
+          maxLength: 200
+        is_default:
+          type: boolean
+        is_active:
+          type: boolean
+      required:
+      - address1
+      - phone
+      - postcode
+      - recipient
+    UserMin:
+      type: object
+      properties:
+        user_id:
+          type: string
+          format: uuid
+          readOnly: true
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        role:
+          $ref: '#/components/schemas/UserMinRoleEnum'
+        status:
+          $ref: '#/components/schemas/Status84aEnum'
+        is_active:
+          type: boolean
+          title: 활성
+          description: 이 사용자가 활성화되어 있는지를 나타냅니다. 계정을 삭제하는 대신 이것을 선택 해제하세요.
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - email
+      - user_id
+    UserMinRoleEnum:
+      enum:
+      - user
+      - manager
+      - admin
+      - cs
+      type: string
+      description: |-
+        * `user` - User
+        * `manager` - Manager
+        * `admin` - Admin
+        * `cs` - CS
+    UserRoleUpdate:
+      type: object
+      properties:
+        role:
+          $ref: '#/components/schemas/UserRoleUpdateRoleEnum'
+      required:
+      - role
+    UserRoleUpdateRoleEnum:
+      enum:
+      - user
+      - manager
+      - admin
+      - cs
+      type: string
+      description: |-
+        * `user` - user
+        * `manager` - manager
+        * `admin` - admin
+        * `cs` - cs
+    WebhookInRequest:
+      type: object
+      properties:
+        tracking_number:
+          type: string
+        carrier:
+          type: string
+        carrier_code:
+          type: string
+        events:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        payload:
+          type: object
+          additionalProperties: {}
+    WishlistItemRead:
+      type: object
+      properties:
+        wishlist_id:
+          type: string
+          format: uuid
+          readOnly: true
+        user_id:
+          type: string
+          format: uuid
+          readOnly: true
+        product_id:
+          type: string
+          format: uuid
+          readOnly: true
+        product_name:
+          type: string
+          readOnly: true
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          readOnly: true
+        option_key:
+          type: string
+          maxLength: 64
+        options: {}
+        primary_image:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - price
+      - primary_image
+      - product_id
+      - product_name
+      - user_id
+      - wishlist_id
+    WishlistItemWrite:
+      type: object
+      properties:
+        wishlist_id:
+          type: string
+          format: uuid
+          readOnly: true
+        product_id:
+          type: string
+          format: uuid
+        option_key:
+          type: string
+          default: ''
+        options: {}
+      required:
+      - product_id
+      - wishlist_id
+    WishlistItemWriteRequest:
+      type: object
+      properties:
+        product_id:
+          type: string
+          format: uuid
+        option_key:
+          type: string
+          default: ''
+        options: {}
+      required:
+      - product_id
+  securitySchemes:
+    jwtAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+servers:
+- url: /

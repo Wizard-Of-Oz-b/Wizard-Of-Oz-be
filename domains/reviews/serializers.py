@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from rest_framework import serializers
-from domains.reviews.models import Review
+
 from domains.orders.models import Purchase
+from domains.reviews.models import Review
 
 
 class ReviewReadSerializer(serializers.ModelSerializer):
@@ -12,7 +13,14 @@ class ReviewReadSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Review
-        fields = ["review_id", "user_id", "product_id", "rating", "content", "created_at"]
+        fields = [
+            "review_id",
+            "user_id",
+            "product_id",
+            "rating",
+            "content",
+            "created_at",
+        ]
 
 
 class ReviewWriteSerializer(serializers.ModelSerializer):
@@ -21,11 +29,15 @@ class ReviewWriteSerializer(serializers.ModelSerializer):
     - 입력 필드는 rating, content 만 받는다.
     - user/product_id는 뷰/컨텍스트 기반으로 내부에서 주입한다.
     """
+
     rating = serializers.IntegerField(min_value=1, max_value=5)
 
     class Meta:
         model = Review
-        fields = ["rating", "content"]  # 입력 전용 필드만 노출 (user/product_id는 내부 주입)
+        fields = [
+            "rating",
+            "content",
+        ]  # 입력 전용 필드만 노출 (user/product_id는 내부 주입)
 
     # ---- 내부 유틸: product_id 추출 ----
     def _get_product_id(self):
@@ -65,7 +77,9 @@ class ReviewWriteSerializer(serializers.ModelSerializer):
         if not Purchase.objects.filter(
             user=user, product_id=product_id, status=Purchase.STATUS_PAID
         ).exists():
-            raise serializers.ValidationError("you must have a paid purchase for this product")
+            raise serializers.ValidationError(
+                "you must have a paid purchase for this product"
+            )
 
         # 2) 1인 1리뷰
         if Review.objects.filter(user=user, product_id=product_id).exists():

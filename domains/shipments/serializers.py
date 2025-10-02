@@ -50,7 +50,9 @@ class RegisterShipmentSerializer(serializers.Serializer):
 
         normalized_carrier = carrier or carrier_code
         if not normalized_carrier:
-            raise serializers.ValidationError("carrier 또는 carrier_code 중 하나는 필수입니다.")
+            raise serializers.ValidationError(
+                "carrier 또는 carrier_code 중 하나는 필수입니다."
+            )
 
         # 내부 표준 키로 정규화
         attrs["carrier"] = normalized_carrier

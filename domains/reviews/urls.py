@@ -1,4 +1,5 @@
 from django.urls import path
+
 from .views import ReviewDetailAPI
 
 app_name = "reviews"

@@ -1,4 +1,6 @@
+# tests/test_shipments_services_unit.py
 import pytest
+
 import domains.shipments.services as svc
 
 # 모델/상수 안전 임포트
@@ -7,7 +9,9 @@ from domains.shipments import models as ship_models
 
 Shipment = ship_models.Shipment
 ShipmentEvent = ship_models.ShipmentEvent
-ShipmentStatus = getattr(ship_models, "ShipmentStatus", None)  # TextChoices 일 수도, 없을 수도
+ShipmentStatus = getattr(
+    ship_models, "ShipmentStatus", None
+)  # TextChoices 일 수도, 없을 수도
 
 
 def S(name: str, default: str):
@@ -34,7 +38,7 @@ def test_upsert_events_idempotent_and_status_rollup(user_factory, product_factor
 
     sh = Shipment.objects.create(
         user=user,
-        order=purchase,
+        order=purchase,  # ★ order 필수
         carrier="kr.cjlogistics",
         tracking_number="CJT123",
         status=S("PENDING", "PENDING"),
@@ -77,13 +81,15 @@ def test_upsert_events_idempotent_and_status_rollup(user_factory, product_factor
     assert svc.upsert_events_from_adapter(payload) == 0
 
     # 배송완료 이벤트 추가 → DELIVERED
-    payload["events"].append({
-        "occurred_at": "2025-09-24T06:00:00Z",
-        "status": "delivered",
-        "location": "수령지",
-        "description": "배송완료",
-        "provider_code": "LAST",
-    })
+    payload["events"].append(
+        {
+            "occurred_at": "2025-09-24T06:00:00Z",
+            "status": "delivered",
+            "location": "수령지",
+            "description": "배송완료",
+            "provider_code": "LAST",
+        }
+    )
     assert svc.upsert_events_from_adapter(payload) == 1
 
     sh.refresh_from_db()
@@ -103,7 +109,7 @@ def test_sync_by_tracking_uses_adapter_and_updates(user_factory, product_factory
 
     sh = Shipment.objects.create(
         user=user,
-        order=purchase,
+        order=purchase,  # ★ order 필수
         carrier="kr.cjlogistics",
         tracking_number="CJT999",
         status=S("PENDING", "PENDING"),
@@ -120,10 +126,18 @@ def test_sync_by_tracking_uses_adapter_and_updates(user_factory, product_factory
 
         def parse_events(self, raw):
             return [
-                {"occurred_at": "2025-09-24T01:00:00Z", "status": "in_transit",
-                 "location": "서울허브", "description": "집화"},
-                {"occurred_at": "2025-09-24T03:00:00Z", "status": "out_for_delivery",
-                 "location": "강남구", "description": "배송출발"},
+                {
+                    "occurred_at": "2025-09-24T01:00:00Z",
+                    "status": "in_transit",
+                    "location": "서울허브",
+                    "description": "집화",
+                },
+                {
+                    "occurred_at": "2025-09-24T03:00:00Z",
+                    "status": "out_for_delivery",
+                    "location": "강남구",
+                    "description": "배송출발",
+                },
             ]
 
     created = svc.sync_by_tracking(

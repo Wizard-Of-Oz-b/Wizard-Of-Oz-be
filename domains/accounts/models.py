@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import uuid
+from typing import Optional
+
 from django.conf import settings
-from django.db import models
 from django.contrib.auth.models import AbstractUser
+from django.db import models
 
 
 # ----- Enums -------------------------------------------------
@@ -15,16 +17,16 @@ class UserStatus(models.TextChoices):
 
 
 class UserRole(models.TextChoices):
-    USER    = "user", "User"
+    USER = "user", "User"
     MANAGER = "manager", "Manager"
-    ADMIN   = "admin", "Admin"
-    CS      = "cs", "CS"
+    ADMIN = "admin", "Admin"
+    CS = "cs", "CS"
 
 
 class ProviderType(models.TextChoices):
     GOOGLE = "google", "Google"
-    NAVER  = "naver", "Naver"
-    KAKAO  = "kakao", "Kakao"
+    NAVER = "naver", "Naver"
+    KAKAO = "kakao", "Kakao"
 
 
 # ----- Models ------------------------------------------------
@@ -36,6 +38,7 @@ class User(AbstractUser):
     - role/status 필드 추가
     - role 'admin' 이면 장고 어드민 접근(is_staff=True) 자동 허용
     """
+
     # ✅ 기존 코드와의 호환을 위해 별칭 유지 (User.Role.choices 사용 가능)
     Role = UserRole
 
@@ -118,6 +121,7 @@ class SocialAccount(models.Model):
     - (provider, provider_uid) 유니크
     - (user, provider) 유니크 : 동일 유저에 같은 provider 중복 방지
     """
+
     id = models.UUIDField(
         primary_key=True,
         default=uuid.uuid4,
@@ -161,16 +165,19 @@ class SocialAccount(models.Model):
 # ----- AddressBook ------------------------------------------------
 from django.db.models import Q
 
+
 class UserAddress(models.Model):
     address_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user       = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="addresses")
-    recipient  = models.CharField(max_length=50)
-    phone      = models.CharField(max_length=20)
-    postcode   = models.CharField(max_length=10)
-    address1   = models.CharField(max_length=200)                 # 도로명/지번
-    address2   = models.CharField(max_length=200, default="", blank=True)  # 상세
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="addresses"
+    )
+    recipient = models.CharField(max_length=50)
+    phone = models.CharField(max_length=20)
+    postcode = models.CharField(max_length=10)
+    address1 = models.CharField(max_length=200)  # 도로명/지번
+    address2 = models.CharField(max_length=200, default="", blank=True)  # 상세
     is_default = models.BooleanField(default=False)
-    is_active  = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -179,7 +186,11 @@ class UserAddress(models.Model):
         indexes = [models.Index(fields=["user", "-created_at"])]
         constraints = [
             # 사용자당 기본배송지 1개만 허용
-            models.UniqueConstraint(fields=["user"], condition=Q(is_default=True), name="uq_user_default_address"),
+            models.UniqueConstraint(
+                fields=["user"],
+                condition=Q(is_default=True),
+                name="uq_user_default_address",
+            ),
         ]
 
     def __str__(self) -> str:
