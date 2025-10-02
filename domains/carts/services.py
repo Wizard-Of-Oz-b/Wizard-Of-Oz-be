@@ -96,8 +96,7 @@ def get_user_cart(user, create: bool = True) -> Cart | None:
     if not user or getattr(user, "is_anonymous", False):
         return None
     if create:
-        cart, _ = Cart.objects.get_or_create(user=user)
-        return cart
+        return get_or_create_user_cart(user)  # 통일된 함수 사용
     return Cart.objects.filter(user=user).first()
 
 
