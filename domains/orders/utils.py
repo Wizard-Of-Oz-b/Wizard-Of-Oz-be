@@ -1,4 +1,4 @@
-=from urllib.parse import parse_qsl
+from urllib.parse import parse_qsl
 
 def parse_option_key_safe(option_key: str) -> dict[str, str]:
     """
