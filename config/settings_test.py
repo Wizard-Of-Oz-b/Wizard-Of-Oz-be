@@ -1,4 +1,4 @@
-from .settings import *  # 기존 설정 상속
+from .settings import *  # noqa: F403, F401
 
 # ──────────────────────────────────────────────
 # DB: SQLite 인메모리 (Postgres 없이 테스트용)

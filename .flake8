@@ -2,3 +2,5 @@
 max-line-length = 100
 ignore = E402,E712,F841,F402,E203,W503,E501
 exclude = .git,__pycache__,*/migrations/*,.venv,build,dist,venv
+per-file-ignores =
+    config/settings_test.py: F401, F403
