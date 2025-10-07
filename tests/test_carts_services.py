@@ -4,7 +4,6 @@ domains/carts/services.py 테스트
 
 from datetime import timedelta
 from decimal import Decimal
-from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
 from django.utils import timezone
@@ -19,7 +18,6 @@ from domains.carts.services import (
     get_user_cart,
     make_option_key,
 )
-from domains.catalog.models import Category, Product
 
 User = get_user_model()
 

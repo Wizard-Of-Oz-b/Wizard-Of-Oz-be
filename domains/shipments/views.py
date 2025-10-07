@@ -1,14 +1,14 @@
 # domains/shipments/views.py
 import logging
 import os
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 
 import requests
 from drf_spectacular.utils import OpenApiParameter, extend_schema
-from rest_framework import parsers, permissions, status, views
+from rest_framework import parsers, permissions, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView

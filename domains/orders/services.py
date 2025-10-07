@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
@@ -17,7 +17,6 @@ from domains.catalog.services import (
     release_stock,
     reserve_stock,
 )
-from domains.payments.services import create_payment_stub
 
 from .models import OrderItem, Purchase
 
@@ -26,8 +25,6 @@ User = get_user_model()
 
 class EmptyCartError(ValidationError):
     """장바구니가 없거나 비어 있을 때 사용하는 호환 예외"""
-
-    pass
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -222,7 +219,6 @@ def validate_cart_stock(user: Any) -> None:
     재고 부족 시 ValidationError 발생
     """
     from domains.carts.services import get_user_cart
-
     cart = get_user_cart(user, create=False)
     if not cart or not cart.items.exists():
         raise EmptyCartError({"cart": "장바구니가 비어 있습니다."})

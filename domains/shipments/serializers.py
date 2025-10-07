@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
-from .models import Shipment, ShipmentEvent
+from .models import Shipment
 
 
 # ---------------------------

@@ -2,8 +2,6 @@
 domains/accounts/jwt.py 테스트
 """
 
-from unittest.mock import MagicMock, patch
-
 from django.contrib.auth import get_user_model
 
 import pytest

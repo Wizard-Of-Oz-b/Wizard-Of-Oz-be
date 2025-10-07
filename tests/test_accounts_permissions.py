@@ -3,8 +3,6 @@ domains/accounts/permissions.py 테스트
 """
 
 import pytest
-from rest_framework import status
-from rest_framework.test import APIClient
 
 from domains.accounts.models import User
 

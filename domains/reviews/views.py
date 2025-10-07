@@ -3,7 +3,6 @@ from django.shortcuts import get_object_or_404
 
 from drf_spectacular.utils import OpenApiParameter, OpenApiTypes, extend_schema
 from rest_framework import generics, permissions
-from rest_framework.response import Response
 
 from domains.catalog.models import Product
 from domains.reviews.models import Review

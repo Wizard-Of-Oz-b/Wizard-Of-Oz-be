@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, Optional
 
 from django.core.serializers.json import DjangoJSONEncoder
 from django.utils.timezone import localtime

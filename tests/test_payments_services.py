@@ -2,7 +2,6 @@
 domains/payments/services.py 테스트
 """
 
-from datetime import timedelta
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
@@ -10,9 +9,7 @@ from django.utils import timezone
 
 import pytest
 
-from domains.accounts.models import User
-from domains.carts.models import Cart, CartItem
-from domains.catalog.models import Product, ProductStock
+from domains.catalog.models import ProductStock
 from domains.orders.models import OrderItem, Purchase
 from domains.payments.models import (
     Payment as PaymentModel,
@@ -23,12 +20,8 @@ from domains.payments.services import (
     ORDER_STATUS_PAID,
     ORDER_STATUS_READY,
     PAYMENT_STATUS_CANCELED,
-    PAYMENT_STATUS_IN_PROGRESS,
     PAYMENT_STATUS_PAID,
     PAYMENT_STATUS_READY,
-    PAYMENT_STATUS_WAITING_FOR_DEPOSIT,
-    Payment,
-    PaymentEvent,
     _record_event,
     cancel_payment,
     confirm_payment,

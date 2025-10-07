@@ -1,5 +1,5 @@
 from rest_framework import serializers
-
+from decimal import Decimal
 from .models import Payment, PaymentCancel, PaymentEvent
 
 
@@ -28,7 +28,7 @@ class PaymentCancelRequestSerializer(serializers.Serializer):
     cancel_amount = serializers.DecimalField(max_digits=12, decimal_places=2)
 
     tax_free_amount = serializers.DecimalField(
-        max_digits=12, decimal_places=2, required=False, default=0
+        max_digits=12, decimal_places=2, required=False, default=Decimal("0.00")
     )
     # 모델에 order_item FK가 있을 때만 쓰도록 ID로 받음(선택)
 
@@ -45,7 +45,7 @@ class PaymentCancelRequestSerializer(serializers.Serializer):
         )
         # 모델에 order_item 필드가 실제로 있을 때만 세팅
         if hasattr(PaymentCancel, "order_item") and data.get("order_item_id"):
-            cancel.order_item_id = data["order_item_id"]
+            cancel.order_item = data["order_item"]
         cancel.save()
         return cancel
 

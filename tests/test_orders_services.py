@@ -2,17 +2,13 @@
 domains/orders/services.py 테스트
 """
 
-from datetime import timedelta
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
-from django.utils import timezone
-
 import pytest
 
-from domains.accounts.models import User
 from domains.carts.models import Cart, CartItem
-from domains.catalog.models import Category, Product, ProductStock
+from domains.catalog.models import ProductStock
 from domains.orders.models import OrderItem, Purchase
 from domains.orders.services import (
     EmptyCartError,

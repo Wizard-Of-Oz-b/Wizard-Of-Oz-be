@@ -1,8 +1,6 @@
 from django.urls import include, path
 
 from .views import (
-    CheckoutAPI,
-    CheckoutView,
     OrderItemDetailAPI,
     OrderItemListAPI,
     PurchaseCancelAPI,

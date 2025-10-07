@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, Optional, Tuple
+from typing import Any, Dict, Iterable, Optional
 
 from django.db import transaction
 from django.db.models import Max, Min
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
+from datetime import datetime, timezone as dt_timezone
+from typing import Optional
 
 from .adapters.sweettracker import SweetTrackerAdapter
 from .models import Shipment, ShipmentEvent, ShipmentStatus
@@ -40,7 +42,6 @@ def sync_by_tracking(carrier: str, tracking_number: str, adapter=None) -> int:
     if adapter is None:
         try:
             from .adapters import get_adapter
-
             adapter = get_adapter(carrier)
         except Exception:
             adapter = SweetTrackerAdapter()
@@ -210,21 +211,22 @@ def upsert_events_from_adapter(payload: Dict[str, Any]) -> int:
     return created_count
 
 
-def _parse_dt_safe(value) -> Optional[timezone.datetime]:
+def _parse_dt_safe(value) -> Optional[datetime]:
     if not value:
         return None
+
     s = str(value).strip()
     if s.startswith("-") or s.count("-") < 2:
         return None
+
     dt = parse_datetime(s)
     try:
         # naive → aware 보정
         if dt and timezone.is_naive(dt):
-            dt = timezone.make_aware(dt, timezone=timezone.utc)
+            dt = timezone.make_aware(dt, timezone=dt_timezone.utc)
     except Exception:
         pass
     return dt
-
 
 def _recompute_status_from_events(shipment: Shipment) -> str:
     """

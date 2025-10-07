@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import uuid
-from typing import Optional
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser

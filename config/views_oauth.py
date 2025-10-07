@@ -2,7 +2,6 @@ import os
 import secrets
 import urllib.parse
 
-from django.conf import settings
 from django.http import HttpResponseBadRequest, HttpResponseRedirect
 
 

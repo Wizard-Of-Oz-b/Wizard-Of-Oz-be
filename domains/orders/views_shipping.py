@@ -1,6 +1,5 @@
 from django.db import transaction
 from django.shortcuts import get_object_or_404
-from django.utils import timezone
 
 from drf_spectacular.utils import extend_schema
 from rest_framework import permissions, status, views

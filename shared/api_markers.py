@@ -23,8 +23,6 @@ class EmptySerializer(serializers.Serializer):
             pass
     """
 
-    pass
-
 
 class EmptyRequestSerializer(serializers.Serializer):
     """
@@ -34,8 +32,6 @@ class EmptyRequestSerializer(serializers.Serializer):
     향후 요청 전용 로직이 추가될 수 있습니다.
     """
 
-    pass
-
 
 class SimpleResponseSerializer(serializers.Serializer):
     """
@@ -43,8 +39,6 @@ class SimpleResponseSerializer(serializers.Serializer):
 
     기본적인 응답 구조를 제공하는 마커 클래스입니다.
     """
-
-    pass
 
 
 class ActionResponseSerializer(serializers.Serializer):

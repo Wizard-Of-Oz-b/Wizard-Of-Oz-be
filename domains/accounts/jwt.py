@@ -1,7 +1,6 @@
-# domains/accounts/jwt.py
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import check_password
-
+from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
@@ -32,10 +31,10 @@ class EmailTokenObtainPairSerializer(TokenObtainPairSerializer):
             )
 
         # 기본 토큰 발급 로직 재사용
-        refresh = self.get_token(user)
+        refresh = RefreshToken.for_user(user)
         return {
-            "refresh": str(refresh),
             "access": str(refresh.access_token),
+            "refresh": str(refresh),
         }
 
 
