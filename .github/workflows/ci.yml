@@ -18,19 +18,14 @@ jobs:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: shopapi_test
         options: >-
-          --health-cmd "pg_isready -U postgres -d shopapi_test"
-                    --health-interval 10s
-                    --health-timeout 5s
-                    --health-retries 10
+          options: >-
+            --health-cmd="pg_isready -U postgres -d shopapi_test" --health-interval=10s --health-timeout=5s --health-retries=10
         ports: []
 
       redis:
         image: redis:7
         options: >-
-          --health-cmd="redis-cli ping"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
+          --health-cmd="redis-cli ping" --health-interval=10s --health-timeout=5s --health-retries=5
         ports: []
 
     steps:
@@ -71,7 +66,7 @@ jobs:
       #  PostgreSQL & Redis 준비 대기
       - name: Wait for PostgreSQL & Redis to be ready
         run: |
-          echo "⏳ Waiting for PostgreSQL and Redis to be ready..."
+          echo "Waiting for PostgreSQL and Redis to be ready..."
           for i in {1..15}; do
             nc -z postgres 5432 && echo "PostgreSQL ready!" && break || echo "Waiting for PostgreSQL ($i/15)..."
             sleep 3
@@ -83,9 +78,9 @@ jobs:
 
       - name: Verify DB connectivity
         run: |
-          echo "🔍 Checking PostgreSQL connection..."
+          echo "Checking PostgreSQL connection..."
           for i in {1..10}; do
-          pg_isready -h 127.0.0.1 -p 5432 -U postgres && echo "✅ PostgreSQL reachable" && break
+          pg_isready -h 127.0.0.1 -p 5432 -U postgres && echo "PostgreSQL reachable" && break
           echo "Waiting for DB... ($i/10)"
           sleep 3
           done      
