@@ -14,19 +14,17 @@ jobs:
       postgres:
         image: postgres:15
         env:
-          DB_HOST: localhost
-          DB_PORT: 5432
-          DB_NAME: shopapi_test
-          DB_USER: postgres
-          DB_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: shopapi_test
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-        ports:
-          - 5432:5432
-      
+        # ✅ 포트 매핑 제거
+        ports: [ ]
+
       redis:
         image: redis:7
         options: >-
@@ -34,8 +32,7 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-        ports:
-          - 6379:6379
+        ports: [ ]
 
     steps:
     - uses: actions/checkout@v4
