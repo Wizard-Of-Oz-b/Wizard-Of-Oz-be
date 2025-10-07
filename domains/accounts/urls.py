@@ -1,9 +1,7 @@
 from django.urls import path
 
-
 from .views import LoginView, LogoutView, MeView, RefreshView, RegisterView
 from .views_social import SocialLoginView, SocialUnlinkView
-
 
 urlpatterns = [
     # 기존 인증

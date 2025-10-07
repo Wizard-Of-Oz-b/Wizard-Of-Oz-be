@@ -1,7 +1,6 @@
 # api/staff/views.py
 import mimetypes
 
-
 # URL 다운로드(저장 모드)용
 import os
 import uuid
