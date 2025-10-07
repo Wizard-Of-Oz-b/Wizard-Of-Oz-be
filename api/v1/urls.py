@@ -1,4 +1,3 @@
-# api/v1/urls.py
 from django.urls import include, path
 
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
@@ -8,7 +7,6 @@ from domains.accounts.jwt import EmailTokenObtainPairView  # ← 커스텀 토�
 
 urlpatterns = [
     # --- Auth ---
-    path("auth/", include(("domains.accounts.urls_auth", "accounts_auth"))),
     path("auth/token/", EmailTokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("auth/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path(

@@ -12,7 +12,7 @@ from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import parsers, permissions, status, views
 from rest_framework.response import Response
 from rest_framework.views import APIView
-
+from rest_framework.permissions import IsAuthenticated
 from domains.orders.models import Purchase  # Shipment.order FK 대상
 
 from .models import Shipment

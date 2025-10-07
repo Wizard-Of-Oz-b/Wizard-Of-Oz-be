@@ -219,7 +219,6 @@ X_FRAME_OPTIONS = "DENY"
 
 CORS_ALLOWED_ORIGINS = [
     "https://ozshop-kappa.vercel.app",
-    "https://ozshop-kappa.vercel.app/",
     "https://3-34-164-251.sslip.io",
     "http://localhost:5173",
     "https://localhost:5173",
@@ -234,7 +233,6 @@ CSRF_TRUSTED_ORIGINS = [
     "https://3.34.164.251",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    "https://ozshop-kappa.vercel.app/",
     "https://ozshop.duckdns.org",
 ]
 
