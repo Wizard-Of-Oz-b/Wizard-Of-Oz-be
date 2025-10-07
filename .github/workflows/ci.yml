@@ -14,9 +14,11 @@ jobs:
       postgres:
         image: postgres:15
         env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: shopapi_test
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: shopapi_test
+          DB_USER: postgres
+          DB_PASSWORD: postgres
         options: >-
           --health-cmd pg_isready
           --health-interval 10s

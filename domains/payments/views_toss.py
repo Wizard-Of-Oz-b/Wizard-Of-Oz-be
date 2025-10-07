@@ -61,7 +61,6 @@ class TossConfirmAPI(views.APIView):
             if payment.status == PaymentStatus.PAID:
                 return Response({"detail": "already confirmed"}, status=400)
 
-
             # 3) 금액 일치 검증(있다면)
             expected = Decimal(str(payment.amount_total)).quantize(Decimal("0.01"))
             given = Decimal(str(amount)).quantize(Decimal("0.01"))

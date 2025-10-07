@@ -219,6 +219,7 @@ def validate_cart_stock(user: Any) -> None:
     재고 부족 시 ValidationError 발생
     """
     from domains.carts.services import get_user_cart
+
     cart = get_user_cart(user, create=False)
     if not cart or not cart.items.exists():
         raise EmptyCartError({"cart": "장바구니가 비어 있습니다."})

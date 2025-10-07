@@ -12,6 +12,7 @@ toss_client.cancel = lambda payment_key, amount, reason, tax_free_amount=0: {
     "paymentId": payment_key,
 }
 
+
 @pytest.mark.django_db
 def test_toss_confirm_and_cancel(
     monkeypatch, user_factory, product_factory, create_stock

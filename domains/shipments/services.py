@@ -42,6 +42,7 @@ def sync_by_tracking(carrier: str, tracking_number: str, adapter=None) -> int:
     if adapter is None:
         try:
             from .adapters import get_adapter
+
             adapter = get_adapter(carrier)
         except Exception:
             adapter = SweetTrackerAdapter()
@@ -227,6 +228,7 @@ def _parse_dt_safe(value) -> Optional[datetime]:
     except Exception:
         pass
     return dt
+
 
 def _recompute_status_from_events(shipment: Shipment) -> str:
     """
