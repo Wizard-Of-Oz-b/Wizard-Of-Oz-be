@@ -18,15 +18,12 @@ jobs:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: shopapi_test
         options: >-
-          options: >-
-            --health-cmd="pg_isready -U postgres -d shopapi_test" --health-interval=10s --health-timeout=5s --health-retries=10
-        ports: []
+          --health-cmd="pg_isready -U postgres -d shopapi_test" --health-interval=10s --health-timeout=5s --health-retries=10
 
       redis:
         image: redis:7
         options: >-
           --health-cmd="redis-cli ping" --health-interval=10s --health-timeout=5s --health-retries=5
-        ports: []
 
     steps:
       - uses: actions/checkout@v4
