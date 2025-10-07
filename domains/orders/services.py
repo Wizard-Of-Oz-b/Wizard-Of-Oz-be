@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
@@ -17,7 +17,6 @@ from domains.catalog.services import (
     release_stock,
     reserve_stock,
 )
-from domains.payments.services import create_payment_stub
 
 from .models import OrderItem, Purchase
 
@@ -26,8 +25,6 @@ User = get_user_model()
 
 class EmptyCartError(ValidationError):
     """장바구니가 없거나 비어 있을 때 사용하는 호환 예외"""
-
-    pass
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -89,7 +86,6 @@ def checkout_user_cart(user: Any, *, clear_cart: bool = True) -> List[Purchase]:
     # 4) 카트 비우기 (직접 삭제로 보증)
     if clear_cart:
         CartItem.objects.filter(cart_id=cart.id).delete()
-
 
     # 5) 생성된 구매 목록 재조회해서 반환 (PK 포함 보장)
     purchases = list(
@@ -178,7 +174,6 @@ def checkout(user: Any) -> Tuple[Purchase, Any]:
     order.items_total = line_total_sum
     order.grand_total = line_total_sum  # 배송비/쿠폰 있으면 계산식 반영
     order.save(update_fields=["items_total", "grand_total"])
-
 
     # 5) 장바구니 비우기
     from domains.carts.services import clear_cart as clear_cart_items

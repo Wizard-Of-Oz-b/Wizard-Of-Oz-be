@@ -28,7 +28,6 @@ class PurchaseAdmin(admin.ModelAdmin):
     ordering = ("-purchased_at",)
 
 
-
 @admin.register(OrderItem)
 class OrderItemAdmin(admin.ModelAdmin):
     list_display = (

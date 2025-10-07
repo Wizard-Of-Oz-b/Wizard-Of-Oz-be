@@ -1,8 +1,7 @@
-# domains/shipments/adapters/base.py
 from typing import Any, Dict, List
 
 
-class CarrierAdapter:
+class BaseAdapter:
     """
     각 택배사 어댑터의 최소 공통 인터페이스
     """

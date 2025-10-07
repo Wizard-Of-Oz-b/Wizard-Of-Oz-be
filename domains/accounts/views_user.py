@@ -1,12 +1,11 @@
 from django.shortcuts import get_object_or_404
 
-from rest_framework import generics, status
+from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
 
 from .models import User
 from .permissions import IsSelf
-from .serializers import UserMeSerializer
+from .serializers import MeSerializer as UserMeSerializer
 
 
 # 1) /api/v1/users/  -> 본인만 1건 리스트로 반환 (Swagger에 기존 경로 유지용)

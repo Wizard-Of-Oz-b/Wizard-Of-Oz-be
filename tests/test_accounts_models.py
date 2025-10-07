@@ -2,7 +2,7 @@ from django.contrib.auth import get_user_model
 
 import pytest
 
-from domains.accounts.models import SocialAccount, UserAddress, UserRole
+from domains.accounts.models import SocialAccount, UserAddress
 
 User = get_user_model()
 

@@ -3,8 +3,8 @@ from django.contrib.auth import get_user_model
 
 import django_filters as df
 from django_filters.rest_framework import DjangoFilterBackend
-from drf_spectacular.utils import OpenApiExample, OpenApiResponse, extend_schema
-from rest_framework import filters, generics, permissions, serializers, status
+from drf_spectacular.utils import OpenApiResponse, extend_schema
+from rest_framework import filters, generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -50,7 +50,6 @@ class LoginView(APIView):
 
         refresh = RefreshToken.for_user(user)
         access = str(refresh.access_token)
-
 
         resp = Response(
             {"access": access, "refresh": str(refresh)}, status=status.HTTP_200_OK

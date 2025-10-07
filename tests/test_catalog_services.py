@@ -2,16 +2,11 @@
 domains/catalog/services.py 테스트
 """
 
-from decimal import Decimal
-from unittest.mock import MagicMock, patch
-
 import pytest
 
-from domains.accounts.models import User
-from domains.catalog.models import Category, Product, ProductStock
+from domains.catalog.models import ProductStock
 from domains.catalog.services import (
     OutOfStockError,
-    StockRowMissing,
     get_stock_quantity,
     normalize_option_key,
     release_stock,

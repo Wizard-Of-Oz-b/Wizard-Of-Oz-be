@@ -5,9 +5,8 @@ from urllib.parse import urlencode
 from django.conf import settings
 from django.http import HttpResponseRedirect
 
-from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
-from rest_framework import generics, permissions, status
+from rest_framework import generics, permissions
 from rest_framework.response import Response
 
 from .social import SocialAuthError, _provider_config, generate_authorize_url

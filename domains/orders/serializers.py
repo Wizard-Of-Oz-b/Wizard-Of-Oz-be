@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
-from domains.orders.utils import parse_option_key_safe
-
 from .models import OrderItem, Purchase
 
 
@@ -83,6 +81,7 @@ class PurchaseWriteSerializer(serializers.ModelSerializer):
         if v < 1:
             raise serializers.ValidationError("amount must be >= 1")
         return v
+
 
 PurchaseSerializer = PurchaseReadSerializer
 

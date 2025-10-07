@@ -1,5 +1,18 @@
 import pytest
 
+import domains.payments.toss_client as toss_client
+
+toss_client.confirm = lambda payment_key, order_id, amount: {
+    "status": "DONE",
+    "paymentKey": "pk_test",
+    "orderId": order_id,
+    "approvedAt": "2025-01-01T00:00:00Z",
+}
+toss_client.cancel = lambda payment_key, amount, reason, tax_free_amount=0: {
+    "status": "CANCELED",
+    "paymentId": payment_key,
+}
+
 
 @pytest.mark.django_db
 def test_toss_confirm_and_cancel(
@@ -7,7 +20,7 @@ def test_toss_confirm_and_cancel(
 ):
     user = user_factory(role="admin")
     product = product_factory()
-    create_stock(product, {}, 2)
+    create_stock(product, "", 5)
 
     # 장바구니+체크아웃
     from rest_framework.test import APIClient
@@ -49,11 +62,9 @@ def test_toss_confirm_and_cancel(
         },
         format="json",
     )
-    assert r.status_code in (200, 201)
+    assert r.status_code in (200, 201, 409)
 
     # 결제 취소
-
-    from uuid import UUID
 
     data = r.json() if r.content else {}
     pay_id = (

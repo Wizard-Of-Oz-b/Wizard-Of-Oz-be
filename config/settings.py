@@ -3,7 +3,6 @@ import os
 from datetime import timedelta
 from pathlib import Path
 
-from celery.schedules import crontab
 from dotenv import load_dotenv
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -101,13 +100,14 @@ def env_multi(*keys, default=None):
             return v
     return default
 
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
         "HOST": os.getenv("DB_HOST", "localhost"),
         "PORT": os.getenv("DB_PORT", "5432"),
         "NAME": os.getenv("DB_NAME", "django"),
-        "USER": os.getenv("DB_USER", "postgres"),
+        "USER": os.getenv("DB_USER") or "postgres",
         "PASSWORD": os.getenv("DB_PASSWORD", "postgres"),
     }
 }
@@ -194,9 +194,9 @@ SIMPLE_JWT = {
 # Security / CORS / CSRF
 COOKIE_SECURE = not DEBUG
 SESSION_COOKIE_SAMESITE = "None"
-CSRF_COOKIE_SAMESITE    = "None"
-SESSION_COOKIE_SECURE   = True
-CSRF_COOKIE_SECURE      = True
+CSRF_COOKIE_SAMESITE = "None"
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
 CORS_ALLOW_CREDENTIALS = True
 
 # HTTPS Security Settings
@@ -219,7 +219,6 @@ X_FRAME_OPTIONS = "DENY"
 
 CORS_ALLOWED_ORIGINS = [
     "https://ozshop-kappa.vercel.app",
-    "https://ozshop-kappa.vercel.app/",
     "https://3-34-164-251.sslip.io",
     "http://localhost:5173",
     "https://localhost:5173",
@@ -234,7 +233,6 @@ CSRF_TRUSTED_ORIGINS = [
     "https://3.34.164.251",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    "https://ozshop-kappa.vercel.app/",
     "https://ozshop.duckdns.org",
 ]
 
@@ -311,10 +309,7 @@ SHIPMENTS_NOTIFY_WEBHOOK = os.getenv("SHIPMENTS_NOTIFY_WEBHOOK")
 APPEND_SLASH = False
 
 
-
 FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "http://localhost:5173")
 FRONTEND_OAUTH_CALLBACK = os.getenv(
-    "FRONTEND_OAUTH_CALLBACK",
-    f"{FRONTEND_BASE_URL.rstrip('/')}/oauth/callback"
+    "FRONTEND_OAUTH_CALLBACK", f"{FRONTEND_BASE_URL.rstrip('/')}/oauth/callback"
 )
-

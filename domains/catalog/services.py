@@ -12,13 +12,9 @@ from .models import ProductStock
 class OutOfStockError(Exception):
     """요청 수량보다 재고가 부족할 때"""
 
-    pass
-
 
 class StockRowMissing(Exception):
     """해당 (product, option_key) 재고 행이 존재하지 않을 때"""
-
-    pass
 
 
 # -----------------------------

@@ -152,7 +152,6 @@ class PaymentCancel(models.Model):
     # 필요 시 order_item FK 연결 가능
     # order_item = models.ForeignKey("orders.OrderItem", ...)
 
-
     status = models.CharField(
         max_length=16, choices=CancelStatus.choices, default=CancelStatus.REQUESTED
     )

@@ -6,4 +6,3 @@ class OrdersConfig(AppConfig):
     name = "domains.orders"
 
     label = "orders"  # ← 명시!
-

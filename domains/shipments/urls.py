@@ -1,15 +1,12 @@
 from django.urls import path
 
 from .views import (
-
     RegisterShipmentAPI,
-
     ShipmentDetailAPI,
     ShipmentsListAPI,
     ShipmentSyncAPI,
     ShipmentTrackAPI,
     ShipmentWebhookAPI,
-
 )
 
 app_name = "shipments"
@@ -27,5 +24,4 @@ urlpatterns = [
     # (옵션) 문자열 PK 백업 라우트 — 반드시 맨 끝 (충돌 방지)
     path("<str:id>/", ShipmentDetailAPI.as_view(), name="shipment-detail-str"),
     path("shipments/track/", ShipmentTrackAPI.as_view(), name="shipments-track"),
-
 ]

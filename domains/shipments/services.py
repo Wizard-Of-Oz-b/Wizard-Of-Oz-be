@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, Optional, Tuple
+from datetime import datetime, timezone as dt_timezone
+from typing import Any, Dict, Iterable, Optional
 
 from django.db import transaction
 from django.db.models import Max, Min
@@ -49,7 +50,6 @@ def sync_by_tracking(carrier: str, tracking_number: str, adapter=None) -> int:
     raw = dict(raw or {})
     raw.setdefault("carrier", carrier)
     raw.setdefault("tracking_number", tracking_number)
-
 
     events = adapter.parse_events(
         raw
@@ -121,7 +121,7 @@ def upsert_events_from_adapter(payload: Dict[str, Any]) -> int:
     latest_desc = ""
 
     for e in events:
-        status = _norm_status(e.get("status"))
+        status = _norm_status(e.get("status") or "")
         raw_time = (
             e.get("occurred_at")
             or e.get("time")
@@ -211,17 +211,19 @@ def upsert_events_from_adapter(payload: Dict[str, Any]) -> int:
     return created_count
 
 
-def _parse_dt_safe(value) -> Optional[timezone.datetime]:
+def _parse_dt_safe(value) -> Optional[datetime]:
     if not value:
         return None
+
     s = str(value).strip()
     if s.startswith("-") or s.count("-") < 2:
         return None
+
     dt = parse_datetime(s)
     try:
         # naive → aware 보정
         if dt and timezone.is_naive(dt):
-            dt = timezone.make_aware(dt, timezone=timezone.utc)
+            dt = timezone.make_aware(dt, timezone=dt_timezone.utc)
     except Exception:
         pass
     return dt

@@ -31,7 +31,7 @@ class UserRoleUpdateSerializer(serializers.Serializer):
 class CategoryAdminSerializer(serializers.ModelSerializer):
     parent = serializers.PrimaryKeyRelatedField(
         queryset=Category.objects.all(), allow_null=True, required=False
-    )
+    )  # type: ignore[assignment]
     level = serializers.ChoiceField(
         choices=CategoryLevel.choices, read_only=True
     )  # parent로 자동
@@ -76,7 +76,7 @@ class CategoryAdminSerializer(serializers.ModelSerializer):
 class ProductAdminSerializer(serializers.ModelSerializer):
     category = serializers.PrimaryKeyRelatedField(
         queryset=Category.objects.all(), allow_null=True, required=False
-    )
+    )  # type: ignore[assignment]
     category_path = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
@@ -102,7 +102,7 @@ class ProductAdminSerializer(serializers.ModelSerializer):
 
 # --- Catalog: Product Stock ---
 class ProductStockAdminSerializer(serializers.ModelSerializer):
-    product = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all())
+    product = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all())  # type: ignore[assignment]
     product_name = serializers.SerializerMethodField(read_only=True)
 
     class Meta:

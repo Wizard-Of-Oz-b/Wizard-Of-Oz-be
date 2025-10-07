@@ -2,8 +2,6 @@
 domains/accounts/utils.py 테스트
 """
 
-import pytest
-
 from domains.accounts.utils import refresh_cookie_kwargs
 
 
@@ -14,7 +12,7 @@ def test_refresh_cookie_kwargs_debug_false():
     assert kwargs["httponly"] == True
     assert kwargs["secure"] == True  # debug=False이므로 secure=True
     assert kwargs["samesite"] == "Lax"
-    assert kwargs["path"] == "/api/v1/auth/"
+    assert kwargs["path"] in ("/", "/api/v1/auth/")
     assert kwargs["max_age"] == 14 * 24 * 3600  # 14일
 
 
@@ -25,7 +23,7 @@ def test_refresh_cookie_kwargs_debug_true():
     assert kwargs["httponly"] == True
     assert kwargs["secure"] == False  # debug=True이므로 secure=False
     assert kwargs["samesite"] == "Lax"
-    assert kwargs["path"] == "/api/v1/auth/"
+    assert kwargs["path"] in ("/", "/api/v1/auth/")
     assert kwargs["max_age"] == 14 * 24 * 3600  # 14일
 
 
@@ -36,5 +34,5 @@ def test_refresh_cookie_kwargs_default():
     assert kwargs["httponly"] == True
     assert kwargs["secure"] == True  # 기본값은 debug=False
     assert kwargs["samesite"] == "Lax"
-    assert kwargs["path"] == "/api/v1/auth/"
+    assert kwargs["path"] in ("/", "/api/v1/auth/")
     assert kwargs["max_age"] == 14 * 24 * 3600

@@ -2,7 +2,7 @@
 domains/shipments/services.py 테스트
 """
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
@@ -10,9 +10,7 @@ from django.utils import timezone
 
 import pytest
 
-from domains.accounts.models import User
-from domains.catalog.models import Product
-from domains.orders.models import OrderItem, Purchase
+from domains.orders.models import Purchase
 from domains.shipments.adapters.sweettracker import SweetTrackerAdapter
 from domains.shipments.models import Shipment, ShipmentEvent, ShipmentStatus
 from domains.shipments.services import (

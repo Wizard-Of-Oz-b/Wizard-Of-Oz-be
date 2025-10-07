@@ -1,9 +1,8 @@
 # domains/shipments/adapters/sweettracker.py
 import logging
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
-from django.conf import settings
 from django.utils import timezone
 
 import requests
@@ -40,7 +39,6 @@ class SweetTrackerAdapter:
             "kr.dongbu": "16",  # 동부택배
             "kr.kglogis": "17",  # KG로지스
             "kr.inno": "18",  # 이노지스
-            "kr.kdexp": "19",  # KGB택배
             "kr.slx": "20",  # SLX
             "kr.tnt": "21",  # TNT Express
             "kr.ups": "22",  # UPS
@@ -57,7 +55,6 @@ class SweetTrackerAdapter:
         logger.info(f"Registering tracking: {tracking_number} for carrier: {carrier}")
         # SweetTracker API는 등록 기능이 없고 조회만 가능
         # 실제 구현에서는 다른 서비스나 내부 시스템에 등록 정보를 저장할 수 있음
-        pass
 
     def fetch_tracking(
         self, tracking_number: str, carrier: str = "kr.cjlogistics"
@@ -172,7 +169,7 @@ class SweetTrackerAdapter:
         for e in events:
             dedupe_key = (
                 str(e.get("id"))
-                or f"{raw.get('tracking_number','')}-{e.get('occurred_at') or e.get('time')}-{e.get('status')}"
+                or f"{raw.get('tracking_number', '')}-{e.get('occurred_at') or e.get('time')}-{e.get('status')}"
             )
             out.append(
                 {
