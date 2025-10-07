@@ -22,7 +22,7 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-        # ✅ 포트 매핑 제거
+        # 포트 매핑 제거
         ports: [ ]
 
       redis:
@@ -68,18 +68,18 @@ jobs:
     - name: Run type checking (mypy)
       run: |
         uv run mypy domains/ --show-error-codes
-    
+
     - name: Run tests with coverage
       env:
         # Database settings
-        DB_HOST: localhost
+        DB_HOST: postgres
         DB_PORT: 5432
         DB_NAME: shopapi_test
         DB_USER: postgres
         DB_PASSWORD: postgres
         
         # Redis settings
-        REDIS_HOST: localhost
+        REDIS_HOST: redis
         REDIS_PORT: 6379
         REDIS_DB: 0
         
