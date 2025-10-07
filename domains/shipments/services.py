@@ -1,13 +1,12 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone as dt_timezone
 from typing import Any, Dict, Iterable, Optional
 
 from django.db import transaction
 from django.db.models import Max, Min
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
-from datetime import datetime, timezone as dt_timezone
-from typing import Optional
 
 from .adapters.sweettracker import SweetTrackerAdapter
 from .models import Shipment, ShipmentEvent, ShipmentStatus

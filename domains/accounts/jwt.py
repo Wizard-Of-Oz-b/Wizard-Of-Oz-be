@@ -1,8 +1,9 @@
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import check_password
-from rest_framework_simplejwt.tokens import RefreshToken
+
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 
 User = get_user_model()

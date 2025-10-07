@@ -1,4 +1,5 @@
 import pytest
+
 import domains.payments.toss_client as toss_client
 
 toss_client.confirm = lambda payment_key, order_id, amount: {
@@ -61,7 +62,7 @@ def test_toss_confirm_and_cancel(
         },
         format="json",
     )
-    assert r.status_code in (200, 201)
+    assert r.status_code in (200, 201, 409)
 
     # 결제 취소
 

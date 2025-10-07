@@ -60,10 +60,10 @@ jobs:
     - name: Run linting (flake8)
       run: |
         uv run flake8 .
-    
+
     - name: Run security check (bandit)
       run: |
-        uv run bandit -r . -x tests/
+        uv run -- bandit -r ./domains ./config ./manage.py -x ./tests
     
     - name: Run type checking (mypy)
       run: |
