@@ -51,7 +51,6 @@ class LoginView(APIView):
         refresh = RefreshToken.for_user(user)
         access = str(refresh.access_token)
 
-
         resp = Response(
             {"access": access, "refresh": str(refresh)}, status=status.HTTP_200_OK
         )

@@ -101,6 +101,7 @@ def env_multi(*keys, default=None):
             return v
     return default
 
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
@@ -194,9 +195,9 @@ SIMPLE_JWT = {
 # Security / CORS / CSRF
 COOKIE_SECURE = not DEBUG
 SESSION_COOKIE_SAMESITE = "None"
-CSRF_COOKIE_SAMESITE    = "None"
-SESSION_COOKIE_SECURE   = True
-CSRF_COOKIE_SECURE      = True
+CSRF_COOKIE_SAMESITE = "None"
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
 CORS_ALLOW_CREDENTIALS = True
 
 # HTTPS Security Settings
@@ -309,10 +310,7 @@ SHIPMENTS_NOTIFY_WEBHOOK = os.getenv("SHIPMENTS_NOTIFY_WEBHOOK")
 APPEND_SLASH = False
 
 
-
 FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "http://localhost:5173")
 FRONTEND_OAUTH_CALLBACK = os.getenv(
-    "FRONTEND_OAUTH_CALLBACK",
-    f"{FRONTEND_BASE_URL.rstrip('/')}/oauth/callback"
+    "FRONTEND_OAUTH_CALLBACK", f"{FRONTEND_BASE_URL.rstrip('/')}/oauth/callback"
 )
-

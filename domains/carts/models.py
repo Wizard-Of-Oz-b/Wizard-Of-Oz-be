@@ -47,7 +47,6 @@ class Cart(models.Model):
             models.UniqueConstraint(fields=["user"], name="uq_user_single_cart")
         ]
 
-
     def __str__(self) -> str:  # pragma: no cover
         return f"Cart({self.pk}) of {self.user_id}"
 

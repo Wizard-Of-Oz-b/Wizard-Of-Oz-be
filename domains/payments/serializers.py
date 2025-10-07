@@ -8,9 +8,7 @@ class PaymentReadSerializer(serializers.ModelSerializer):
         model = Payment
         fields = (
             "payment_id",
-
             "order_id",  # 모델에 없다면 지우세요
-
             "order_number",
             "status",
             "amount_total",

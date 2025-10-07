@@ -2,10 +2,11 @@ import os, secrets, urllib.parse
 from django.conf import settings
 from django.http import HttpResponseBadRequest, HttpResponseRedirect
 
+
 def oauth_start(request, provider: str):
     provider = provider.lower()
     state = secrets.token_urlsafe(24)
-    request.session['oauth_state'] = state
+    request.session["oauth_state"] = state
 
     if provider == "kakao":
         client_id = os.getenv("KAKAO_CLIENT_ID")
@@ -48,4 +49,3 @@ def oauth_start(request, provider: str):
 
     url = f"{auth}?{urllib.parse.urlencode(qs)}"
     return HttpResponseRedirect(url)
-

@@ -50,7 +50,6 @@ def sync_by_tracking(carrier: str, tracking_number: str, adapter=None) -> int:
     raw.setdefault("carrier", carrier)
     raw.setdefault("tracking_number", tracking_number)
 
-
     events = adapter.parse_events(
         raw
     )  # [{occurred_at, status, location, description, ...}, ...]

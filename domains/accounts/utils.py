@@ -1,5 +1,6 @@
 from django.conf import settings
 
+
 def refresh_cookie_kwargs(debug: bool = False) -> dict:
     """
     리프레시 쿠키 속성 통일:

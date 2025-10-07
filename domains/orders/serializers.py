@@ -84,6 +84,7 @@ class PurchaseWriteSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("amount must be >= 1")
         return v
 
+
 PurchaseSerializer = PurchaseReadSerializer
 
 
