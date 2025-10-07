@@ -121,7 +121,7 @@ def upsert_events_from_adapter(payload: Dict[str, Any]) -> int:
     latest_desc = ""
 
     for e in events:
-        status = _norm_status(e.get("status"))
+        status = _norm_status(e.get("status") or "")
         raw_time = (
             e.get("occurred_at")
             or e.get("time")

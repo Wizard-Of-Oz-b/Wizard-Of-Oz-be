@@ -1,6 +1,9 @@
+from __future__ import annotations
+
+from typing import Optional, Union, Any
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
-
+from django.db.models import ForeignObjectRel
 import django_filters as df
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import OpenApiParameter, OpenApiTypes, extend_schema
@@ -17,23 +20,24 @@ from .serializers import ProductImageSlim, ProductReadSerializer, ProductWriteSe
 # ─────────────────────────────────────────────────────────────────────────────
 # 내부 유틸 (이미지 액세서/정렬)
 # ─────────────────────────────────────────────────────────────────────────────
-def _image_accessor_for_product() -> str | None:
+def _image_accessor_for_product() -> Optional[str]:
     """
     Product -> ProductImage 역참조 accessor 이름을 런타임에 탐색한다.
     (예: 'images', 'product_images', 'productimage_set')
     """
     for f in Product._meta.get_fields():
-        if f.auto_created and f.is_relation and getattr(f, "related_model", None):
-            if f.related_model.__name__ in ("ProductImage", "Image"):
-                return f.get_accessor_name()
+        # ForeignObjectRel만 get_accessor_name을 가지고 있음
+        if isinstance(f, ForeignObjectRel):
+            related_model: Any = getattr(f, "related_model", None)
+            if related_model and hasattr(related_model, "__name__"):
+                model_name = getattr(related_model, "__name__", "")
+                if model_name in ("ProductImage", "Image"):
+                    return f.get_accessor_name()
     return None
 
 
 def _order_images(qs):
-    """
-    대표 우선 정렬: is_main DESC → display_order ASC → created_at ASC
-    필드가 없으면 가능한 범위에서만 정렬.
-    """
+    """대표 우선 정렬: is_main DESC → display_order ASC → created_at ASC"""
     try:
         return qs.order_by("-is_main", "display_order", "created_at")
     except Exception:
@@ -53,11 +57,13 @@ class ProductFilter(df.FilterSet):
     q = df.CharFilter(method="filter_q")
     min_price = df.NumberFilter(field_name="price", lookup_expr="gte")
     max_price = df.NumberFilter(field_name="price", lookup_expr="lte")
-    # UUID 필터 (라이브러리 버전에 따라 UUIDFilter 없으면 CharFilter 대체)
-    try:
-        category_id = df.UUIDFilter(field_name="category_id")
-    except AttributeError:
+
+    # ✅ UUIDFilter가 존재하지 않을 경우 안전 대체
+    if hasattr(df, "UUIDFilter"):
+        category_id: Union[df.UUIDFilter, df.CharFilter] = df.UUIDFilter(field_name="category_id")
+    else:
         category_id = df.CharFilter(field_name="category_id")
+
     is_active = df.BooleanFilter()
 
     def filter_q(self, qs, name, value):
@@ -76,7 +82,7 @@ class ProductListCreateAPI(generics.ListCreateAPIView):
     filterset_class = ProductFilter
     ordering_fields = ["name", "price", "created_at"]
     pagination_class = StandardResultsSetPagination
-    serializer_class = ProductReadSerializer  # 기본 읽기
+    serializer_class = ProductReadSerializer
 
     def get_queryset(self):
         qs = Product.objects.all().select_related("category").order_by("-created_at")
@@ -86,7 +92,6 @@ class ProductListCreateAPI(generics.ListCreateAPIView):
         return qs
 
     def get_permissions(self):
-        # 목록은 공개, 생성은 관리자
         return (
             [permissions.IsAdminUser()]
             if self.request.method == "POST"
@@ -100,7 +105,6 @@ class ProductListCreateAPI(generics.ListCreateAPIView):
             else ProductReadSerializer
         )
 
-    # 절대 URL 생성을 위해 request 전달
     def get_serializer_context(self):
         ctx = super().get_serializer_context()
         ctx["request"] = self.request
@@ -109,25 +113,11 @@ class ProductListCreateAPI(generics.ListCreateAPIView):
     @extend_schema(
         operation_id="ListProducts",
         parameters=[
-            OpenApiParameter(
-                "q",
-                OpenApiTypes.STR,
-                OpenApiParameter.QUERY,
-                required=False,
-                description="이름/설명 검색",
-            ),
-            OpenApiParameter(
-                "min_price", OpenApiTypes.NUMBER, OpenApiParameter.QUERY, required=False
-            ),
-            OpenApiParameter(
-                "max_price", OpenApiTypes.NUMBER, OpenApiParameter.QUERY, required=False
-            ),
-            OpenApiParameter(
-                "category_id", OpenApiTypes.UUID, OpenApiParameter.QUERY, required=False
-            ),
-            OpenApiParameter(
-                "is_active", OpenApiTypes.BOOL, OpenApiParameter.QUERY, required=False
-            ),
+            OpenApiParameter("q", OpenApiTypes.STR, OpenApiParameter.QUERY, required=False, description="이름/설명 검색"),
+            OpenApiParameter("min_price", OpenApiTypes.NUMBER, OpenApiParameter.QUERY, required=False),
+            OpenApiParameter("max_price", OpenApiTypes.NUMBER, OpenApiParameter.QUERY, required=False),
+            OpenApiParameter("category_id", OpenApiTypes.UUID, OpenApiParameter.QUERY, required=False),
+            OpenApiParameter("is_active", OpenApiTypes.BOOL, OpenApiParameter.QUERY, required=False),
             OpenApiParameter(
                 "ordering",
                 OpenApiTypes.STR,
@@ -166,7 +156,6 @@ class ProductDetailAPI(generics.RetrieveUpdateDestroyAPIView):
         return qs
 
     def get_permissions(self):
-        # 열람은 모두 허용, 수정/삭제는 관리자만
         return (
             [permissions.IsAdminUser()]
             if self.request.method in ("PATCH", "DELETE")
@@ -185,9 +174,7 @@ class ProductDetailAPI(generics.RetrieveUpdateDestroyAPIView):
         ctx["request"] = self.request
         return ctx
 
-    @extend_schema(
-        operation_id="RetrieveProduct", responses={200: ProductReadSerializer}
-    )
+    @extend_schema(operation_id="RetrieveProduct", responses={200: ProductReadSerializer})
     def get(self, *args, **kwargs):
         return super().get(*args, **kwargs)
 
@@ -208,17 +195,12 @@ class ProductDetailAPI(generics.RetrieveUpdateDestroyAPIView):
 # Public: /api/v1/products/{product_id}/images/
 # ─────────────────────────────────────────────────────────────────────────────
 class ProductImagesAPI(generics.GenericAPIView):
-    """
-    상품의 이미지 리스트를 공개로 반환.
-    응답: ProductImageSlim[]
-    """
+    """상품의 이미지 리스트를 공개로 반환."""
 
     permission_classes = [permissions.AllowAny]
-    lookup_url_kwarg = "product_id"  # urls에서 <uuid:product_id>와 매칭
+    lookup_url_kwarg = "product_id"
 
-    @extend_schema(
-        operation_id="ListProductImages", responses=ProductImageSlim(many=True)
-    )
+    @extend_schema(operation_id="ListProductImages", responses=ProductImageSlim(many=True))
     def get(self, request, *args, **kwargs):
         product = get_object_or_404(Product, pk=kwargs.get(self.lookup_url_kwarg))
         acc = _image_accessor_for_product()

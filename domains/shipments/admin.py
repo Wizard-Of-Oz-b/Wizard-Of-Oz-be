@@ -162,7 +162,7 @@ class ShipmentAdmin(admin.ModelAdmin):
             return "-"
         return getattr(u, "email", None) or getattr(u, "username", None) or str(u)
 
-    user_display.short_description = "User"
+    user_display.short_description = "User" # type: ignore[attr-defined]
 
     def carrier_display(self, obj):
         value = pick_attr(obj, "carrier", "carrier_code", "provider")
@@ -177,7 +177,7 @@ class ShipmentAdmin(admin.ModelAdmin):
             obj, "invoice_no", "tracking_number", "waybill_no", default="-"
         )
 
-    invoice_no_display.short_description = "Invoice/Tracking"
+    invoice_no_display.short_description = "Invoice/Tracking" # type: ignore[attr-defined]
 
     def status_display(self, obj):
         value = pick_attr(obj, "status", "state", "delivery_status")

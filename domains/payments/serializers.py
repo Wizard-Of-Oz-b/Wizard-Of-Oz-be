@@ -1,5 +1,6 @@
 from decimal import Decimal
-
+from django.apps import apps
+from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
 
 from .models import Payment, PaymentCancel, PaymentEvent
@@ -28,26 +29,31 @@ class PaymentReadSerializer(serializers.ModelSerializer):
 class PaymentCancelRequestSerializer(serializers.Serializer):
     reason = serializers.CharField(required=False, allow_blank=True)
     cancel_amount = serializers.DecimalField(max_digits=12, decimal_places=2)
-
     tax_free_amount = serializers.DecimalField(
         max_digits=12, decimal_places=2, required=False, default=Decimal("0.00")
     )
-    # 모델에 order_item FK가 있을 때만 쓰도록 ID로 받음(선택)
-
     order_item_id = serializers.UUIDField(required=False, allow_null=True)
 
-    def save(self, *, payment: Payment, status: str) -> PaymentCancel:
+    def save(self, *, payment: Payment, status: str) -> PaymentCancel:  # type: ignore[override]
         data = self.validated_data
+
         cancel = PaymentCancel(
             payment=payment,
             reason=data.get("reason") or "",
             cancel_amount=data["cancel_amount"],
-            tax_free_amount=data.get("tax_free_amount") or 0,
+            tax_free_amount=data.get("tax_free_amount") or Decimal("0.00"),
             status=status,
         )
-        # 모델에 order_item 필드가 실제로 있을 때만 세팅
-        if hasattr(PaymentCancel, "order_item") and data.get("order_item_id"):
-            cancel.order_item = data["order_item"]
+
+        # ✅ 모델에 order_item 필드가 실제로 존재하고, order_item_id가 주어진 경우만 처리
+        model_fields = {f.name for f in PaymentCancel._meta.get_fields()}
+        if "order_item" in model_fields and data.get("order_item_id"):
+            try:
+                OrderItem = apps.get_model("orders", "OrderItem")
+                cancel.order_item = OrderItem.objects.get(id=data["order_item_id"]) # type: ignore[attr-defined]
+            except ObjectDoesNotExist:
+                raise serializers.ValidationError({"order_item_id": "Invalid OrderItem ID"})
+
         cancel.save()
         return cancel
 

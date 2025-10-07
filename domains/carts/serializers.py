@@ -166,10 +166,10 @@ class AddCartItemSerializer(serializers.Serializer):
         product: Product = validated["product_obj"]
         quantity: int = validated.get("quantity", 1)
 
-        option_key: Optional[str] = validated.get("option_key", None)
-        options: Optional[Dict[str, Any]] = validated.get("options", None)
+        option_key: Optional[str] = validated.get("option_key")
+        options: Optional[Dict[str, Any]] = validated.get("options")
 
-        # option_key -> options
+        # option_key → options
         if option_key is not None:
             if option_key.strip():
                 parsed = parse_option_key_safe(option_key)
@@ -181,24 +181,28 @@ class AddCartItemSerializer(serializers.Serializer):
             else:
                 options = {}
 
-        # options -> option_key
+        # options → option_key
         if options is not None and option_key is None:
             option_key = make_option_key(options)
 
-        base_kwargs = dict(
-            user=user,
-            product=product,  # 서비스가 product 객체를 받는 구현
-            options=options or {},
-            quantity=quantity,
-            unit_price=product.price,
-        )
-
-        # 서비스 시그니처 편차 흡수 (option_key 요구/불요)
+        # 명시적 호출 (mypy-friendly)
         try:
-            cart, item = add_or_update_item(option_key=option_key or "", **base_kwargs)
+            cart, item = add_or_update_item(
+                user=user,
+                product=product,
+                options=options or {},
+                quantity=quantity,
+                unit_price=product.price,
+                option_key=option_key or "",
+            )
         except TypeError:
-            cart, item = add_or_update_item(**base_kwargs)
-
+            cart, item = add_or_update_item(
+                user=user,
+                product=product,
+                options=options or {},
+                quantity=quantity,
+                unit_price=product.price,
+            )
         return item
 
     def to_representation(self, instance: CartItem) -> Dict[str, Any]:
