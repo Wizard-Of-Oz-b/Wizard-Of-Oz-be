@@ -18,10 +18,10 @@ jobs:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: shopapi_test
         options: >-
-          --health-cmd="pg_isready -U postgres -d shopapi_test"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=10
+          --health-cmd "pg_isready -U postgres -d shopapi_test"
+                    --health-interval 10s
+                    --health-timeout 5s
+                    --health-retries 10
         ports: []
 
       redis:
@@ -81,17 +81,26 @@ jobs:
             sleep 2
           done
 
+      - name: Verify DB connectivity
+        run: |
+          echo "🔍 Checking PostgreSQL connection..."
+          for i in {1..10}; do
+          pg_isready -h 127.0.0.1 -p 5432 -U postgres && echo "✅ PostgreSQL reachable" && break
+          echo "Waiting for DB... ($i/10)"
+          sleep 3
+          done      
+
       - name: Run tests with coverage
         env:
           # Database settings
-          DB_HOST: postgres
+          DB_HOST: 127.0.0.1
           DB_PORT: 5432
           DB_NAME: shopapi_test
           DB_USER: postgres
           DB_PASSWORD: postgres
 
           # Redis settings
-          REDIS_HOST: redis
+          REDIS_HOST: 127.0.0.1
           REDIS_PORT: 6379
           REDIS_DB: 0
 
