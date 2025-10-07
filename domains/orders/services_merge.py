@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Any, List, Tuple, Dict
+from typing import Any, Dict, List, Tuple
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
@@ -28,7 +28,9 @@ def merge_ready_orders(user: Any, order_ids: List[str]) -> Tuple[Purchase, Any]:
     if orders.count() != len(order_ids):
         missing_count = len(order_ids) - orders.count()
         raise ValidationError(
-            {"detail": f"일부 주문을 찾을 수 없거나 이미 처리되었습니다. (누락: {missing_count}개)"}
+            {
+                "detail": f"일부 주문을 찾을 수 없거나 이미 처리되었습니다. (누락: {missing_count}개)"
+            }
         )
 
     if orders.count() < 2:
@@ -181,7 +183,9 @@ def delete_ready_orders(user: Any, order_ids: List[str]) -> Dict[str, Any]:
     if orders.count() != len(order_ids):
         missing_count = len(order_ids) - orders.count()
         raise ValidationError(
-            {"detail": f"일부 주문을 찾을 수 없거나 이미 처리되었습니다. (누락: {missing_count}개)"}
+            {
+                "detail": f"일부 주문을 찾을 수 없거나 이미 처리되었습니다. (누락: {missing_count}개)"
+            }
         )
 
     restored_stock_count = 0

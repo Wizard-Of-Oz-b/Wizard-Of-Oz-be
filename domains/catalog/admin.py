@@ -144,7 +144,7 @@ class ProductAdmin(admin.ModelAdmin):
     def image_count(self, obj: Product):
         return obj.images.count()
 
-    image_count.short_description = "이미지 수" # type: ignore[attr-defined]
+    image_count.short_description = "이미지 수"  # type: ignore[attr-defined]
 
     def main_thumb(self, obj: Product):
         main = (
@@ -156,7 +156,7 @@ class ProductAdmin(admin.ModelAdmin):
         )
         return _thumb_html(url, size=48)
 
-    main_thumb.short_description = "대표" # type: ignore[attr-defined]
+    main_thumb.short_description = "대표"  # type: ignore[attr-defined]
 
 
 # -------- ProductImage (개별 관리) ---------------------------------
@@ -206,7 +206,7 @@ class ProductImageAdmin(admin.ModelAdmin):
             imgs[0].is_main = True
             imgs[0].save(update_fields=["is_main"])
 
-    set_as_main.short_description = "선택 이미지를 대표로 지정(상품별 1개)" # type: ignore[attr-defined]
+    set_as_main.short_description = "선택 이미지를 대표로 지정(상품별 1개)"  # type: ignore[attr-defined]
 
 
 # -------- ProductStock --------------------------------------------

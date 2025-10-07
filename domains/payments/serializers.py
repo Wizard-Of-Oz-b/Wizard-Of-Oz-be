@@ -1,6 +1,8 @@
 from decimal import Decimal
+
 from django.apps import apps
 from django.core.exceptions import ObjectDoesNotExist
+
 from rest_framework import serializers
 
 from .models import Payment, PaymentCancel, PaymentEvent
@@ -50,9 +52,11 @@ class PaymentCancelRequestSerializer(serializers.Serializer):
         if "order_item" in model_fields and data.get("order_item_id"):
             try:
                 OrderItem = apps.get_model("orders", "OrderItem")
-                cancel.order_item = OrderItem.objects.get(id=data["order_item_id"]) # type: ignore[attr-defined]
+                cancel.order_item = OrderItem.objects.get(id=data["order_item_id"])  # type: ignore[attr-defined]
             except ObjectDoesNotExist:
-                raise serializers.ValidationError({"order_item_id": "Invalid OrderItem ID"})
+                raise serializers.ValidationError(
+                    {"order_item_id": "Invalid OrderItem ID"}
+                )
 
         cancel.save()
         return cancel

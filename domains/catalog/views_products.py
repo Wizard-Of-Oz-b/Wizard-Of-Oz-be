@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from typing import Optional, Union, Any
-from django.db.models import Q
+from typing import Any, Optional, Union
+
+from django.db.models import ForeignObjectRel, Q
 from django.shortcuts import get_object_or_404
-from django.db.models import ForeignObjectRel
+
 import django_filters as df
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import OpenApiParameter, OpenApiTypes, extend_schema
@@ -60,7 +61,9 @@ class ProductFilter(df.FilterSet):
 
     # ✅ UUIDFilter가 존재하지 않을 경우 안전 대체
     if hasattr(df, "UUIDFilter"):
-        category_id: Union[df.UUIDFilter, df.CharFilter] = df.UUIDFilter(field_name="category_id")
+        category_id: Union[df.UUIDFilter, df.CharFilter] = df.UUIDFilter(
+            field_name="category_id"
+        )
     else:
         category_id = df.CharFilter(field_name="category_id")
 
@@ -113,11 +116,25 @@ class ProductListCreateAPI(generics.ListCreateAPIView):
     @extend_schema(
         operation_id="ListProducts",
         parameters=[
-            OpenApiParameter("q", OpenApiTypes.STR, OpenApiParameter.QUERY, required=False, description="이름/설명 검색"),
-            OpenApiParameter("min_price", OpenApiTypes.NUMBER, OpenApiParameter.QUERY, required=False),
-            OpenApiParameter("max_price", OpenApiTypes.NUMBER, OpenApiParameter.QUERY, required=False),
-            OpenApiParameter("category_id", OpenApiTypes.UUID, OpenApiParameter.QUERY, required=False),
-            OpenApiParameter("is_active", OpenApiTypes.BOOL, OpenApiParameter.QUERY, required=False),
+            OpenApiParameter(
+                "q",
+                OpenApiTypes.STR,
+                OpenApiParameter.QUERY,
+                required=False,
+                description="이름/설명 검색",
+            ),
+            OpenApiParameter(
+                "min_price", OpenApiTypes.NUMBER, OpenApiParameter.QUERY, required=False
+            ),
+            OpenApiParameter(
+                "max_price", OpenApiTypes.NUMBER, OpenApiParameter.QUERY, required=False
+            ),
+            OpenApiParameter(
+                "category_id", OpenApiTypes.UUID, OpenApiParameter.QUERY, required=False
+            ),
+            OpenApiParameter(
+                "is_active", OpenApiTypes.BOOL, OpenApiParameter.QUERY, required=False
+            ),
             OpenApiParameter(
                 "ordering",
                 OpenApiTypes.STR,
@@ -174,7 +191,9 @@ class ProductDetailAPI(generics.RetrieveUpdateDestroyAPIView):
         ctx["request"] = self.request
         return ctx
 
-    @extend_schema(operation_id="RetrieveProduct", responses={200: ProductReadSerializer})
+    @extend_schema(
+        operation_id="RetrieveProduct", responses={200: ProductReadSerializer}
+    )
     def get(self, *args, **kwargs):
         return super().get(*args, **kwargs)
 
@@ -200,7 +219,9 @@ class ProductImagesAPI(generics.GenericAPIView):
     permission_classes = [permissions.AllowAny]
     lookup_url_kwarg = "product_id"
 
-    @extend_schema(operation_id="ListProductImages", responses=ProductImageSlim(many=True))
+    @extend_schema(
+        operation_id="ListProductImages", responses=ProductImageSlim(many=True)
+    )
     def get(self, request, *args, **kwargs):
         product = get_object_or_404(Product, pk=kwargs.get(self.lookup_url_kwarg))
         acc = _image_accessor_for_product()
