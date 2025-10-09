@@ -79,7 +79,7 @@ class TossConfirmAPI(views.APIView):
 
         #  4) 재고 사전 검증 (토스 결제 전)
         try:
-            validate_cart_stock(payment.order.user)
+            validate_cart_stock(payment.order.user, order=payment.order)
         except (OutOfStockError, StockRowMissing, EmptyCartError) as e:
             # 테스트 환경에서는 skip, 운영에서는 바로 409
             env = os.getenv("DJANGO_ENV", "").lower()

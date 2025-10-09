@@ -33,6 +33,7 @@ from .services import (
     checkout_user_cart,
     refund_purchase,
 )
+from domains.catalog.services import OutOfStockError, StockRowMissing
 
 
 # -------------------------------
@@ -134,9 +135,12 @@ class PurchaseMeListAPI(generics.ListAPIView):
             or not self.request.user.is_authenticated
         ):
             return Purchase.objects.none()
-        return Purchase.objects.filter(user_id=self.request.user.id).order_by(
-            "-purchased_at"
-        )
+        # ✅ DELETED 상태 주문은 제외하고 조회
+        return Purchase.objects.filter(
+            user_id=self.request.user.id
+        ).exclude(
+            status=Purchase.STATUS_DELETED
+        ).order_by("-purchased_at")
 
 
 # -------------------------------
@@ -302,7 +306,13 @@ class CheckoutView(APIView):
                     )
 
         # 3) 체크아웃 실행
-        purchases = checkout_user_cart(request.user, clear_cart=True)
+        try:
+            purchases = checkout_user_cart(request.user, clear_cart=True)
+        except (OutOfStockError, StockRowMissing) as e:
+            return Response(
+                {"detail": f"재고 부족: {str(e)}"}, 
+                status=status.HTTP_409_CONFLICT
+            )
 
         # ✅ failsafe: 혹시 서비스가 카트를 못 비웠다면 여기서 확실히 비움
         try:
@@ -343,6 +353,11 @@ class CheckoutAPI(views.APIView):
             order, payment = checkout(request.user)
         except EmptyCartError as e:
             return Response(e.detail, status=e.status_code)
+        except (OutOfStockError, StockRowMissing) as e:
+            return Response(
+                {"detail": f"재고 부족: {str(e)}"}, 
+                status=status.HTTP_409_CONFLICT
+            )
 
         # ✅ 성공 시: 이 유저의 카트 라인들을 무조건 비움
         CartItem.objects.filter(cart__user=request.user).delete()
