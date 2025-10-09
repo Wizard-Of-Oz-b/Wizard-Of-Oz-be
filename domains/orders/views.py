@@ -15,6 +15,7 @@ from rest_framework.views import APIView
 
 from domains.carts.models import CartItem
 from domains.carts.services import get_user_cart
+from domains.catalog.services import OutOfStockError, StockRowMissing
 from domains.orders.models import OrderItem, Purchase
 from domains.orders.utils import parse_option_key_safe
 from shared.pagination import StandardResultsSetPagination
@@ -33,7 +34,6 @@ from .services import (
     checkout_user_cart,
     refund_purchase,
 )
-from domains.catalog.services import OutOfStockError, StockRowMissing
 
 
 # -------------------------------
@@ -136,11 +136,11 @@ class PurchaseMeListAPI(generics.ListAPIView):
         ):
             return Purchase.objects.none()
         # ✅ DELETED 상태 주문은 제외하고 조회
-        return Purchase.objects.filter(
-            user_id=self.request.user.id
-        ).exclude(
-            status=Purchase.STATUS_DELETED
-        ).order_by("-purchased_at")
+        return (
+            Purchase.objects.filter(user_id=self.request.user.id)
+            .exclude(status=Purchase.STATUS_DELETED)
+            .order_by("-purchased_at")
+        )
 
 
 # -------------------------------
@@ -310,8 +310,7 @@ class CheckoutView(APIView):
             purchases = checkout_user_cart(request.user, clear_cart=True)
         except (OutOfStockError, StockRowMissing) as e:
             return Response(
-                {"detail": f"재고 부족: {str(e)}"}, 
-                status=status.HTTP_409_CONFLICT
+                {"detail": f"재고 부족: {str(e)}"}, status=status.HTTP_409_CONFLICT
             )
 
         # ✅ failsafe: 혹시 서비스가 카트를 못 비웠다면 여기서 확실히 비움
@@ -355,8 +354,7 @@ class CheckoutAPI(views.APIView):
             return Response(e.detail, status=e.status_code)
         except (OutOfStockError, StockRowMissing) as e:
             return Response(
-                {"detail": f"재고 부족: {str(e)}"}, 
-                status=status.HTTP_409_CONFLICT
+                {"detail": f"재고 부족: {str(e)}"}, status=status.HTTP_409_CONFLICT
             )
 
         # ✅ 성공 시: 이 유저의 카트 라인들을 무조건 비움
