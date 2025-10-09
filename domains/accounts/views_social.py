@@ -201,7 +201,9 @@ class SocialFlowDebugView(APIView):
                 "step5": "프론트엔드 → /api/v1/auth/social/{provider}/login/ (code, state, provider 전송)",
             },
             "current_settings": {
-                "frontend_callback": getattr(settings, "FRONTEND_OAUTH_CALLBACK", "NOT_SET"),
+                "frontend_callback": getattr(
+                    settings, "FRONTEND_OAUTH_CALLBACK", "NOT_SET"
+                ),
                 "current_domain": request.build_absolute_uri("/"),
             },
             "providers": {},
@@ -211,12 +213,17 @@ class SocialFlowDebugView(APIView):
             try:
                 cfg = _provider_config(provider)
                 backend_callback = request.build_absolute_uri(
-                    reverse("accounts_auth:social-callback", kwargs={"provider": provider})
+                    reverse(
+                        "accounts_auth:social-callback", kwargs={"provider": provider}
+                    )
                 )
-                
+
                 result["providers"][provider] = {
                     "authorize_url": request.build_absolute_uri(
-                        reverse("accounts_auth:social-authorize", kwargs={"provider": provider})
+                        reverse(
+                            "accounts_auth:social-authorize",
+                            kwargs={"provider": provider},
+                        )
                     ),
                     "callback_url": backend_callback,
                     "login_url": f"/api/v1/auth/social/{provider}/login/",

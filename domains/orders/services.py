@@ -217,13 +217,13 @@ def validate_cart_stock(user: Any, order: Optional[Purchase] = None) -> None:
     """
     장바구니의 모든 아이템 재고를 사전 검증 (토스 결제 전)
     재고 부족 시 ValidationError 발생
-    
+
     order가 주어지고 이미 OrderItem이 생성된 경우, 검증을 스킵 (멱등성)
     """
     # 이미 OrderItem이 생성된 경우 스킵 (체크아웃 시 이미 재고 차감됨)
     if order and OrderItem.objects.filter(order=order).exists():
         return
-    
+
     from domains.carts.services import get_user_cart
 
     cart = get_user_cart(user, create=False)
