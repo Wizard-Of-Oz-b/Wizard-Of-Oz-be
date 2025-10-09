@@ -4,10 +4,12 @@ from urllib.parse import urlencode
 
 from django.conf import settings
 from django.http import HttpResponseRedirect
+from django.urls import reverse
 
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import generics, permissions
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from .social import SocialAuthError, _provider_config, generate_authorize_url
 from .utils import refresh_cookie_kwargs
@@ -114,7 +116,8 @@ class SocialCallbackView(generics.GenericAPIView):
             return Response({"error": "No authorization code"}, status=400)
 
         state = request.GET.get("state", "")
-        qs = urlencode({"code": code, "state": state})
+        # ✅ provider 정보를 프론트엔드로 전달 (프론트가 /login API 호출 시 필요)
+        qs = urlencode({"code": code, "state": state, "provider": provider})
         return HttpResponseRedirect(f"{self.FRONT_CALLBACK}?{qs}")
 
 
@@ -173,3 +176,53 @@ class SocialUnlinkView(generics.GenericAPIView):
         return Response(
             {"message": f"{provider} 계정 연동이 해제되었습니다."}, status=200
         )
+
+
+class SocialFlowDebugView(APIView):
+    """GET /api/v1/auth/social/flow-debug/ - 소셜 로그인 플로우 확인"""
+
+    permission_classes = [permissions.AllowAny]
+
+    @extend_schema(
+        operation_id="SocialFlowDebug",
+        summary="소셜 로그인 플로우 디버그",
+        description="소셜 로그인의 전체 플로우와 현재 설정을 확인합니다.",
+        tags=["Authentication"],
+        responses={200: {"type": "object"}},
+    )
+    def get(self, request):
+        providers = ["google", "naver", "kakao"]
+        result = {
+            "flow": {
+                "step1": "프론트엔드 → /api/v1/auth/social/{provider}/authorize/",
+                "step2": "백엔드 → OAuth 제공자 인가 페이지로 리다이렉트",
+                "step3": "사용자 인증 → OAuth 제공자 → /api/v1/auth/social/{provider}/callback/",
+                "step4": f"백엔드 → 프론트엔드 리다이렉트 ({getattr(settings, 'FRONTEND_OAUTH_CALLBACK', 'NOT_SET')})",
+                "step5": "프론트엔드 → /api/v1/auth/social/{provider}/login/ (code, state, provider 전송)",
+            },
+            "current_settings": {
+                "frontend_callback": getattr(settings, "FRONTEND_OAUTH_CALLBACK", "NOT_SET"),
+                "current_domain": request.build_absolute_uri("/"),
+            },
+            "providers": {},
+        }
+
+        for provider in providers:
+            try:
+                cfg = _provider_config(provider)
+                backend_callback = request.build_absolute_uri(
+                    reverse("accounts_auth:social-callback", kwargs={"provider": provider})
+                )
+                
+                result["providers"][provider] = {
+                    "authorize_url": request.build_absolute_uri(
+                        reverse("accounts_auth:social-authorize", kwargs={"provider": provider})
+                    ),
+                    "callback_url": backend_callback,
+                    "login_url": f"/api/v1/auth/social/{provider}/login/",
+                    "client_id_configured": bool(cfg.get("client_id")),
+                }
+            except Exception as e:
+                result["providers"][provider] = {"error": str(e)}
+
+        return Response(result)
