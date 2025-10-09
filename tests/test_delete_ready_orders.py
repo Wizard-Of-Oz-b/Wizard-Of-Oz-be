@@ -138,8 +138,9 @@ def test_cannot_delete_paid_order(user_factory, product_factory, create_stock):
     client.force_authenticate(user=user)
 
     # PAID 상태 주문 생성
-    from domains.orders.models import Purchase
     import uuid
+
+    from domains.orders.models import Purchase
 
     order = Purchase.objects.create(
         user=user,
