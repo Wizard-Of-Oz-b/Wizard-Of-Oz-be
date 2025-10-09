@@ -171,7 +171,8 @@ def cancel_merged_order(merged_order: Purchase, user: Any) -> Dict[str, Any]:
 @transaction.atomic
 def delete_ready_orders(user: Any, order_ids: List[str]) -> Dict[str, Any]:
     """
-    Ready 상태의 주문들을 삭제하고 재고를 복구
+    Ready 상태의 주문들을 soft delete(상태 변경)하고 재고를 복구
+    이력 관리를 위해 실제로 삭제하지 않고 상태만 변경합니다.
     """
     if not order_ids:
         raise ValidationError({"detail": "삭제할 주문 ID가 필요합니다."})
@@ -207,18 +208,13 @@ def delete_ready_orders(user: Any, order_ids: List[str]) -> Dict[str, Any]:
                 logger = logging.getLogger(__name__)
                 logger.warning(f"재고 복구 실패: {e}, OrderItem ID: {item.item_id}")
 
-    deleted_items_count = 0
-    for order in orders:
-        items_count = OrderItem.objects.filter(order=order).count()
-        OrderItem.objects.filter(order=order).delete()
-        deleted_items_count += items_count
-
+    # ✅ Soft delete: 실제 삭제 대신 상태만 변경
     deleted_orders_count = orders.count()
-    orders.delete()
+    orders.update(status=Purchase.STATUS_DELETED)
 
     return {
         "deleted_orders": deleted_orders_count,
-        "deleted_items": deleted_items_count,
+        "deleted_items": 0,  # soft delete이므로 실제 삭제하지 않음
         "restored_stock": restored_stock_count,
         "message": f"{deleted_orders_count}개의 주문이 삭제되고 {restored_stock_count}개의 재고가 복구되었습니다.",
     }

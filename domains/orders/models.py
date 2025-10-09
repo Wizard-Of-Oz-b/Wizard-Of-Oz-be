@@ -17,6 +17,7 @@ class PurchaseStatus(models.TextChoices):
     CANCELED = "canceled", "Canceled"
     REFUNDED = "refunded", "Refunded"
     MERGED = "merged", "Merged"  # ✅ 다른 주문으로 통합됨
+    DELETED = "deleted", "Deleted"  # ✅ 사용자가 삭제한 주문
 
 
 class Purchase(models.Model):
@@ -26,12 +27,14 @@ class Purchase(models.Model):
     STATUS_CANCELED = "canceled"
     STATUS_REFUNDED = "refunded"
     STATUS_MERGED = "merged"
+    STATUS_DELETED = "deleted"
     STATUS_CHOICES = [
         (STATUS_READY, "Ready"),
         (STATUS_PAID, "Paid"),
         (STATUS_CANCELED, "Canceled"),
         (STATUS_REFUNDED, "Refunded"),
         (STATUS_MERGED, "Merged"),
+        (STATUS_DELETED, "Deleted"),
     ]
 
     # --- PK ---
