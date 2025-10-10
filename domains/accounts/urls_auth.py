@@ -4,7 +4,6 @@ from .views import LoginView, LogoutView, RefreshView, RegisterView
 from .views_social import (
     SocialAuthorizeView,
     SocialCallbackView,
-    SocialFlowDebugView,
     SocialLoginView,
     SocialUnlinkView,
 )
@@ -20,8 +19,6 @@ urlpatterns = [
     path("refresh/", RefreshView.as_view(), name="refresh"),
     # 로그아웃
     path("logout/", LogoutView.as_view(), name="logout"),
-    # 소셜 로그인 플로우 디버그
-    path("social/flow-debug/", SocialFlowDebugView.as_view(), name="social-flow-debug"),
     # 소셜 로그인 (기존 + 프론트엔드 요구사항 OAuth 플로우)
     path(
         "social/<str:provider>/authorize/",
