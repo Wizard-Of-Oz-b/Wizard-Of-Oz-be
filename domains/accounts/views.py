@@ -75,10 +75,10 @@ class RefreshView(APIView):
             refresh = RefreshToken(token)
             new_access = str(refresh.access_token)
 
-            # ✅ Fixed 방식: 새로운 Access Token만 발급 (Refresh Token은 그대로 유지)
+            # Fixed 방식: 새로운 Access Token만 발급 (Refresh Token은 그대로 유지)
             resp = Response({"access": new_access}, status=200)
 
-            # ✅ 쿠키 재설정 없음 (기존 Refresh Token 그대로 유지)
+            # 쿠키 재설정 없음 (기존 Refresh Token 그대로 유지)
             # resp.set_cookie(...) 제거
 
             return resp
