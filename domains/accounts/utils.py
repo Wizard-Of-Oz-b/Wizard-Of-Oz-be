@@ -10,10 +10,12 @@ def refresh_cookie_kwargs(debug: bool = False) -> dict:
     - Domain: (선택) settings.AUTH_COOKIE_DOMAIN 사용, 없으면 host-only
     - Max-Age: settings.AUTH_COOKIE_MAX_AGE(초) / 없으면 14일
     """
+    is_dev = debug or settings.DEBUG
+
     return dict(
         httponly=True,
-        secure=getattr(settings, "AUTH_COOKIE_SECURE", not debug),
-        samesite=getattr(settings, "AUTH_COOKIE_SAMESITE", None) or "Lax",
+        secure=getattr(settings, "AUTH_COOKIE_SECURE", not is_dev),
+        samesite="Lax" if is_dev else "None",
         path=getattr(settings, "AUTH_COOKIE_PATH", "/"),
         domain=getattr(settings, "AUTH_COOKIE_DOMAIN", None),
         max_age=getattr(settings, "AUTH_COOKIE_MAX_AGE", 14 * 24 * 3600),
