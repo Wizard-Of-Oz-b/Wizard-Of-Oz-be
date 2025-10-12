@@ -19,4 +19,5 @@ def refresh_cookie_kwargs(debug: bool = False) -> dict:
         path=getattr(settings, "AUTH_COOKIE_PATH", "/"),
         domain=getattr(settings, "AUTH_COOKIE_DOMAIN", None),
         max_age=getattr(settings, "AUTH_COOKIE_MAX_AGE", 14 * 24 * 3600),
+        partitioned=True,
     )
