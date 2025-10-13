@@ -1,29 +1,40 @@
 # Production Dockerfile (web)
 FROM python:3.13-slim
 
+# ─────────────────────────────────────────────
+# 기본 Python / uv / venv 환경 변수
+# ─────────────────────────────────────────────
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    UV_PROJECT_ENVIRONMENT=/opt/venv
+    UV_PROJECT_ENVIRONMENT=/opt/venv \
+    VIRTUAL_ENV=/opt/venv \
+    PATH="/opt/venv/bin:$PATH"
 
 WORKDIR /app
 
-# build deps for psycopg2, Pillow
+# ─────────────────────────────────────────────
+# 빌드 의존성 설치 (psycopg2, Pillow 등)
+# ─────────────────────────────────────────────
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential libpq-dev libjpeg62-turbo-dev zlib1g-dev curl ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 
-# uv 설치
+# ─────────────────────────────────────────────
+# uv 설치 및 Python 종속성 설치
+# ─────────────────────────────────────────────
 RUN python -m pip install --upgrade pip && pip install uv
 
-# 의존성 캐시 레이어 만들기
 COPY pyproject.toml uv.lock ./
-RUN uv venv /opt/venv \
- && uv sync --frozen
+RUN uv venv /opt/venv && uv sync --frozen
 
-# 앱 코드 (마지막에 복사해 캐시 적게 깨지게)
+# ─────────────────────────────────────────────
+# 앱 코드 복사 (캐시 최소화)
+# ─────────────────────────────────────────────
 COPY . .
 
-# runtime env (HTTP 기준 – HTTPS 전환 시 settings에서 변경)
+# ─────────────────────────────────────────────
+# Django 설정 및 런타임 환경변수
+# ─────────────────────────────────────────────
 ENV DJANGO_SETTINGS_MODULE=config.settings \
     DEBUG=0 \
     ALLOWED_HOSTS=3.34.164.251,localhost,127.0.0.1 \
@@ -31,11 +42,20 @@ ENV DJANGO_SETTINGS_MODULE=config.settings \
     CSRF_COOKIE_SECURE=0 \
     SECURE_SSL_REDIRECT=0
 
-ENV VIRTUAL_ENV=/opt/venv
-ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+# ─────────────────────────────────────────────
+# static 파일 수집 (빌드 시점)
+# ─────────────────────────────────────────────
+RUN bash -c "source /opt/venv/bin/activate && python manage.py collectstatic --noinput || true"
 
-# collectstatic at build (실패 시 빌드 계속)
-RUN uv run python manage.py collectstatic --noinput || true
-
+# ─────────────────────────────────────────────
+# Gunicorn 실행 (가상환경 자동 활성화 포함)
+# ─────────────────────────────────────────────
 EXPOSE 8000
-CMD ["uv", "run", "gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--threads", "3", "--timeout", "60"]
+CMD bash -c "source /opt/venv/bin/activate && \
+python -m django --version && \
+exec gunicorn config.wsgi:application \
+  --bind 0.0.0.0:8000 \
+  --workers 3 \
+  --threads 3 \
+  --timeout 60"
+
