@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, Optional, Tuple
+from datetime import datetime, timezone as dt_timezone
+from typing import Any, Dict, Iterable, Optional
 
 from django.db import transaction
 from django.db.models import Max, Min
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
-from .models import Shipment, ShipmentEvent, ShipmentStatus
 from .adapters.sweettracker import SweetTrackerAdapter
+from .models import Shipment, ShipmentEvent, ShipmentStatus
 
 
 def register_tracking_with_sweettracker(
@@ -40,6 +41,7 @@ def sync_by_tracking(carrier: str, tracking_number: str, adapter=None) -> int:
     if adapter is None:
         try:
             from .adapters import get_adapter
+
             adapter = get_adapter(carrier)
         except Exception:
             adapter = SweetTrackerAdapter()
@@ -49,13 +51,18 @@ def sync_by_tracking(carrier: str, tracking_number: str, adapter=None) -> int:
     raw.setdefault("carrier", carrier)
     raw.setdefault("tracking_number", tracking_number)
 
-    events = adapter.parse_events(raw)
+    events = adapter.parse_events(
+        raw
+    )  # [{occurred_at, status, location, description, ...}, ...]
+
     payload = {
         "carrier": raw.get("carrier"),
         "tracking_number": raw.get("tracking_number"),
         "events": events,
     }
     return upsert_events_from_adapter(payload)
+
+
 # ============================================================================
 
 
@@ -114,7 +121,7 @@ def upsert_events_from_adapter(payload: Dict[str, Any]) -> int:
     latest_desc = ""
 
     for e in events:
-        status = _norm_status(e.get("status"))
+        status = _norm_status(e.get("status") or "")
         raw_time = (
             e.get("occurred_at")
             or e.get("time")
@@ -133,7 +140,9 @@ def upsert_events_from_adapter(payload: Dict[str, Any]) -> int:
         if dt is None:
             continue
 
-        dedupe_key = e.get("dedupe_key") or f"{shipment.id}|{dt.isoformat()}|{status}|{location}"
+        dedupe_key = (
+            e.get("dedupe_key") or f"{shipment.id}|{dt.isoformat()}|{status}|{location}"
+        )
 
         _, created = ShipmentEvent.objects.update_or_create(
             dedupe_key=dedupe_key,
@@ -166,7 +175,7 @@ def upsert_events_from_adapter(payload: Dict[str, Any]) -> int:
             last_event_loc=latest_loc or "",
             last_event_desc=latest_desc or "",
             last_synced_at=timezone.now(),
-            )
+        )
 
     # 전체 상태 재계산
     new_status = _recompute_status_from_events(shipment)
@@ -175,6 +184,7 @@ def upsert_events_from_adapter(payload: Dict[str, Any]) -> int:
     if latest_dt and (prev_last_event_at != latest_dt):
         try:
             from .tasks import notify_shipment  # celery optional
+
             meta = {
                 "latest_event": {
                     "occurred_at": latest_dt.isoformat() if latest_dt else None,
@@ -192,6 +202,7 @@ def upsert_events_from_adapter(payload: Dict[str, Any]) -> int:
     if new_status != prev_status:
         try:
             from .tasks import notify_shipment
+
             meta = {"prev": prev_status, "curr": new_status}
             notify_shipment.delay(str(shipment.id), "status_changed", meta)
         except Exception:
@@ -200,17 +211,19 @@ def upsert_events_from_adapter(payload: Dict[str, Any]) -> int:
     return created_count
 
 
-def _parse_dt_safe(value) -> Optional[timezone.datetime]:
+def _parse_dt_safe(value) -> Optional[datetime]:
     if not value:
         return None
+
     s = str(value).strip()
     if s.startswith("-") or s.count("-") < 2:
         return None
+
     dt = parse_datetime(s)
     try:
         # naive → aware 보정
         if dt and timezone.is_naive(dt):
-            dt = timezone.make_aware(dt, timezone=timezone.utc)
+            dt = timezone.make_aware(dt, timezone=dt_timezone.utc)
     except Exception:
         pass
     return dt
@@ -221,9 +234,15 @@ def _recompute_status_from_events(shipment: Shipment) -> str:
     이벤트 집계로 Shipment.status, shipped_at, delivered_at, canceled_at 갱신
     """
     qs = ShipmentEvent.objects.filter(shipment_id=shipment.id)
-    shipped_first = qs.filter(status="in_transit").aggregate(Min("occurred_at"))["occurred_at__min"]
-    delivered_last = qs.filter(status="delivered").aggregate(Max("occurred_at"))["occurred_at__max"]
-    canceled_last = qs.filter(status="canceled").aggregate(Max("occurred_at"))["occurred_at__max"]
+    shipped_first = qs.filter(status="in_transit").aggregate(Min("occurred_at"))[
+        "occurred_at__min"
+    ]
+    delivered_last = qs.filter(status="delivered").aggregate(Max("occurred_at"))[
+        "occurred_at__max"
+    ]
+    canceled_last = qs.filter(status="canceled").aggregate(Max("occurred_at"))[
+        "occurred_at__max"
+    ]
     out4_exists = qs.filter(status="out_for_delivery").exists()
     in_transit_ok = qs.filter(status="in_transit").exists()
 

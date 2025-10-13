@@ -1,10 +1,9 @@
 # config/settings.py
 import os
-from pathlib import Path
 from datetime import timedelta
-from dotenv import load_dotenv
-from celery.schedules import crontab
+from pathlib import Path
 
+from dotenv import load_dotenv
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Base & Env
@@ -20,8 +19,7 @@ _DEBUG_RAW = os.getenv("DEBUG", "1")
 DEBUG = str(_DEBUG_RAW).strip().lower() in ("1", "true", "yes", "on")
 
 ALLOWED_HOSTS = os.getenv(
-    "ALLOWED_HOSTS",
-    "127.0.0.1,localhost,3.34.164.251,3-34-164-251.sslip.io"
+    "ALLOWED_HOSTS", "127.0.0.1,localhost,3.34.164.251,3-34-164-251.sslip.io"
 ).split(",")
 
 # Applications
@@ -35,7 +33,6 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django_celery_beat",
-
     # 3rd party
     "rest_framework",
     "rest_framework_simplejwt",
@@ -43,7 +40,6 @@ INSTALLED_APPS = [
     "django_filters",
     "drf_spectacular",
     "corsheaders",
-
     # Domain apps
     "domains.accounts",
     "domains.catalog",
@@ -69,7 +65,6 @@ MIDDLEWARE = [
     # 다국어: SessionMiddleware 다음, CommonMiddleware 이전
     "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
-
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
@@ -96,6 +91,7 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
+
 # Database (PostgreSQL)
 def env_multi(*keys, default=None):
     for k in keys:
@@ -104,13 +100,14 @@ def env_multi(*keys, default=None):
             return v
     return default
 
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
         "HOST": os.getenv("DB_HOST", "localhost"),
         "PORT": os.getenv("DB_PORT", "5432"),
         "NAME": os.getenv("DB_NAME", "django"),
-        "USER": os.getenv("DB_USER", "postgres"),
+        "USER": os.getenv("DB_USER") or "postgres",
         "PASSWORD": os.getenv("DB_PASSWORD", "postgres"),
     }
 }
@@ -118,7 +115,7 @@ DATABASES = {
 # ──────────────────────────────────────────────────────────────────────────────
 # Internationalization (ko/en)
 # ──────────────────────────────────────────────────────────────────────────────
-LANGUAGE_CODE = "ko-kr"          # 폴백 언어
+LANGUAGE_CODE = "ko-kr"  # 폴백 언어
 TIME_ZONE = "Asia/Seoul"
 USE_I18N = True
 USE_TZ = True
@@ -135,7 +132,9 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
-    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"
+    },
 }
 
 # DRF & OpenAPI
@@ -168,7 +167,6 @@ SPECTACULAR_SETTINGS = {
         }
     },
     "DISABLE_ERRORS_AND_WARNINGS": True,
-
     "SWAGGER_UI_SETTINGS": {
         "deepLinking": True,
         "displayRequestDuration": True,
@@ -196,24 +194,31 @@ SIMPLE_JWT = {
 # Security / CORS / CSRF
 COOKIE_SECURE = not DEBUG
 SESSION_COOKIE_SAMESITE = "None"
-CSRF_COOKIE_SAMESITE    = "None"
-SESSION_COOKIE_SECURE   = True
-CSRF_COOKIE_SECURE      = True
+CSRF_COOKIE_SAMESITE = "None"
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
 CORS_ALLOW_CREDENTIALS = True
 
 # HTTPS Security Settings
-SECURE_SSL_REDIRECT = str(os.getenv("SECURE_SSL_REDIRECT", "0")).lower() in ("1","true","yes","on")
-SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')  # Nginx에서 전달하는 HTTPS 헤더
+SECURE_SSL_REDIRECT = str(os.getenv("SECURE_SSL_REDIRECT", "0")).lower() in (
+    "1",
+    "true",
+    "yes",
+    "on",
+)
+SECURE_PROXY_SSL_HEADER = (
+    "HTTP_X_FORWARDED_PROTO",
+    "https",
+)  # Nginx에서 전달하는 HTTPS 헤더
 SECURE_HSTS_SECONDS = int(os.getenv("SECURE_HSTS_SECONDS", "0"))
 SECURE_HSTS_INCLUDE_SUBDOMAINS = SECURE_HSTS_SECONDS > 0
 SECURE_HSTS_PRELOAD = SECURE_HSTS_SECONDS > 0
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_BROWSER_XSS_FILTER = True
-X_FRAME_OPTIONS = 'DENY'
+X_FRAME_OPTIONS = "DENY"
 
 CORS_ALLOWED_ORIGINS = [
     "https://ozshop-kappa.vercel.app",
-    "https://ozshop-kappa.vercel.app/",
     "https://3-34-164-251.sslip.io",
     "http://localhost:5173",
     "https://localhost:5173",
@@ -228,7 +233,6 @@ CSRF_TRUSTED_ORIGINS = [
     "https://3.34.164.251",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    "https://ozshop-kappa.vercel.app/",
     "https://ozshop.duckdns.org",
 ]
 
@@ -244,14 +248,14 @@ SOCIAL_OAUTH = {
     "naver": {
         "client_id": os.getenv("NAVER_CLIENT_ID", ""),
         "client_secret": os.getenv("NAVER_CLIENT_SECRET", ""),
-        "redirect_uri": os.getenv("NAVER_REDIRECT_URI", ""),   # ← 수정
+        "redirect_uri": os.getenv("NAVER_REDIRECT_URI", ""),  # ← 수정
         "token_url": "https://nid.naver.com/oauth2.0/token",
         "userinfo_url": "https://openapi.naver.com/v1/nid/me",
     },
     "kakao": {
         "client_id": os.getenv("KAKAO_CLIENT_ID", ""),
         "client_secret": os.getenv("KAKAO_CLIENT_SECRET", ""),
-        "redirect_uri": os.getenv("KAKAO_REDIRECT_URI", ""),   # (유지)
+        "redirect_uri": os.getenv("KAKAO_REDIRECT_URI", ""),  # (유지)
         "token_url": "https://kauth.kakao.com/oauth/token",
         "userinfo_url": "https://kapi.kakao.com/v2/user/me",
     },
@@ -289,7 +293,11 @@ LOGGING = {
     "disable_existing_loggers": False,
     "handlers": {"console": {"class": "logging.StreamHandler"}},
     "loggers": {
-        "django.request": {"handlers": ["console"], "level": "ERROR", "propagate": True},
+        "django.request": {
+            "handlers": ["console"],
+            "level": "ERROR",
+            "propagate": True,
+        },
         "": {"handlers": ["console"], "level": "INFO"},
     },
 }
@@ -303,6 +311,5 @@ APPEND_SLASH = False
 
 FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "http://localhost:5173")
 FRONTEND_OAUTH_CALLBACK = os.getenv(
-    "FRONTEND_OAUTH_CALLBACK",
-    f"{FRONTEND_BASE_URL.rstrip('/')}/oauth/callback"
+    "FRONTEND_OAUTH_CALLBACK", f"{FRONTEND_BASE_URL.rstrip('/')}/oauth/callback"
 )

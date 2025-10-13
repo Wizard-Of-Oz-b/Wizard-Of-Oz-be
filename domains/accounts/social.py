@@ -1,7 +1,9 @@
-import os
 import logging
-import requests
+import os
+
 from django.conf import settings
+
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -13,16 +15,18 @@ class SocialAuthError(Exception):
 def _env(name: str, default: str = "") -> str:
     return os.getenv(name, getattr(settings, name, default))
 
+
 def get_provider_keys(provider: str) -> dict:
     """제공자 키 정보 반환 (기존 _provider_config와 동일)"""
     return _provider_config(provider)
+
 
 def _provider_config(provider: str) -> dict:
     p = provider.lower()
     # settings.SOCIAL_OAUTH 우선 사용
     so = getattr(settings, "SOCIAL_OAUTH", {})
     cfg = (so.get(p) or {}).copy()
-    if cfg.get("client_id"):     # settings에 제대로 들어있으면 그대로 반환
+    if cfg.get("client_id"):  # settings에 제대로 들어있으면 그대로 반환
         return cfg
 
     # settings에 없거나 비어있으면 env로 폴백
@@ -61,18 +65,20 @@ def generate_authorize_url(provider: str, request) -> str:
     """OAuth 인가 URL 생성"""
     cfg = _provider_config(provider)
     client_id = cfg["client_id"]
-    
+
     # 콜백 URL 생성 (현재 도메인 기준)
     from django.urls import reverse
+
     callback_url = request.build_absolute_uri(
-        reverse('accounts_auth:social-callback', kwargs={'provider': provider})
+        reverse("accounts_auth:social-callback", kwargs={"provider": provider})
     )
     redirect_uri = callback_url
-    
+
     # state 파라미터 생성 (CSRF 보호)
     import secrets
+
     state = secrets.token_urlsafe(32)
-    
+
     if provider == "google":
         scope = "openid email profile"
         params = {
@@ -82,10 +88,10 @@ def generate_authorize_url(provider: str, request) -> str:
             "response_type": "code",
             "state": state,
             "access_type": "offline",
-            "prompt": "consent"
+            "prompt": "consent",
         }
         base_url = "https://accounts.google.com/o/oauth2/v2/auth"
-        
+
     elif provider == "naver":
         scope = "name,email,profile_image"
         params = {
@@ -93,10 +99,10 @@ def generate_authorize_url(provider: str, request) -> str:
             "redirect_uri": redirect_uri,
             "response_type": "code",
             "state": state,
-            "scope": scope
+            "scope": scope,
         }
         base_url = "https://nid.naver.com/oauth2.0/authorize"
-        
+
     elif provider == "kakao":
         scope = "profile_nickname,account_email"
         params = {
@@ -104,15 +110,16 @@ def generate_authorize_url(provider: str, request) -> str:
             "redirect_uri": redirect_uri,
             "response_type": "code",
             "state": state,
-            "scope": scope
+            "scope": scope,
         }
         base_url = "https://kauth.kakao.com/oauth/authorize"
-        
+
     else:
         raise SocialAuthError(f"Unsupported provider: {provider}")
-    
+
     # URL 파라미터 생성
     import urllib.parse
+
     query_string = urllib.parse.urlencode(params)
     return f"{base_url}?{query_string}"
 
@@ -120,7 +127,9 @@ def generate_authorize_url(provider: str, request) -> str:
 # -------------------------
 # 코드 → 토큰 교환
 # -------------------------
-def exchange_code_for_tokens(provider: str, code: str, redirect_uri: str, state: str = "") -> dict:
+def exchange_code_for_tokens(
+    provider: str, code: str, redirect_uri: str, state: str = ""
+) -> dict:
     cfg = _provider_config(provider)
     timeout = 10
 
@@ -167,7 +176,9 @@ def exchange_code_for_tokens(provider: str, code: str, redirect_uri: str, state:
         body = {"_raw": resp.text}
 
     if resp.status_code != 200 or "access_token" not in body:
-        logger.warning("%s token error: status=%s body=%s", provider, resp.status_code, body)
+        logger.warning(
+            "%s token error: status=%s body=%s", provider, resp.status_code, body
+        )
         # 가능한 한 원인 문구를 돌려보냄
         msg = body.get("error_description") or body.get("error") or body
         raise SocialAuthError(str(msg))

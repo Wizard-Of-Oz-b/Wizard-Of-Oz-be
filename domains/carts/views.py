@@ -1,21 +1,23 @@
 from __future__ import annotations
 
 from django.shortcuts import get_object_or_404
-from rest_framework import status, permissions, generics
+
+from drf_spectacular.utils import OpenApiParameter, OpenApiTypes, extend_schema
+from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
 
-from .models import CartItem, Cart
+from domains.catalog.models import Product
+
+from .models import Cart, CartItem
 from .serializers import (
-    CartSerializer, 
-    AddCartItemSerializer, 
+    AddCartItemSerializer,
     CartItemSerializer,
+    CartSerializer,
+    UpdateCartItemSerializer,
     UpdateCartQtySerializer,
-    UpdateCartItemSerializer
 )
 from .services import get_or_create_user_cart
-from domains.catalog.models import Product
 
 
 def get_cart_item_prefetch_queryset():
@@ -62,8 +64,7 @@ class MyCartView(APIView):
         prefetches = get_cart_prefetch_queryset()
 
         cart = (
-            Cart.objects
-            .select_related("user")
+            Cart.objects.select_related("user")
             .prefetch_related(*prefetches)
             .get(pk=cart.pk)
         )
@@ -79,8 +80,8 @@ class CartItemAddView(APIView):
 
     @extend_schema(
         operation_id="AddCartItem",
-        request=AddCartItemSerializer,          # 요청 스키마
-        responses={201: CartItemSerializer},    # 응답 스키마
+        request=AddCartItemSerializer,  # 요청 스키마
+        responses={201: CartItemSerializer},  # 응답 스키마
         tags=["Carts"],
     )
     def post(self, request):
@@ -117,13 +118,16 @@ class CartItemQuantityView(APIView):
     PATCH /api/v1/carts/items/{item_id}/quantity
     body: { "quantity": <int>=1+ }
     """
+
     permission_classes = [permissions.IsAuthenticated]
 
     @extend_schema(
         operation_id="UpdateCartItemQuantity",
         request=UpdateCartQtySerializer,
         parameters=[
-            OpenApiParameter("item_id", OpenApiTypes.UUID, OpenApiParameter.PATH, required=True),
+            OpenApiParameter(
+                "item_id", OpenApiTypes.UUID, OpenApiParameter.PATH, required=True
+            ),
         ],
         responses={200: CartItemSerializer, 400: dict, 404: dict},
         tags=["Carts"],
@@ -140,7 +144,9 @@ class CartItemQuantityView(APIView):
         # 최신 product/이미지 프리패치 후 반환
         item = get_cart_item_prefetch_queryset().get(pk=item.pk)
 
-        return Response(CartItemSerializer(item, context={"request": request}).data, status=200)
+        return Response(
+            CartItemSerializer(item, context={"request": request}).data, status=200
+        )
 
 
 # ─────────────────────────────────────────────────────────────
@@ -151,13 +157,16 @@ class CartItemUpdateView(APIView):
     PATCH /api/v1/carts/items/{item_id}/update
     body: { "quantity": <int>, "option_key": "<str>", "options": {} }
     """
+
     permission_classes = [permissions.IsAuthenticated]
 
     @extend_schema(
         operation_id="UpdateCartItemWithOptions",
         request=UpdateCartItemSerializer,
         parameters=[
-            OpenApiParameter("item_id", OpenApiTypes.UUID, OpenApiParameter.PATH, required=True),
+            OpenApiParameter(
+                "item_id", OpenApiTypes.UUID, OpenApiParameter.PATH, required=True
+            ),
         ],
         responses={200: CartItemSerializer, 400: dict, 404: dict},
         tags=["Carts"],
@@ -168,26 +177,28 @@ class CartItemUpdateView(APIView):
         """
         ser = UpdateCartItemSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
-        
+
         item = get_object_or_404(CartItem, pk=item_id, cart__user=request.user)
-        
+
         # 수량 업데이트
         if "quantity" in ser.validated_data:
             item.quantity = ser.validated_data["quantity"]
-        
+
         # 옵션 업데이트
         if "option_key" in ser.validated_data:
             item.option_key = ser.validated_data["option_key"]
-        
+
         if "options" in ser.validated_data:
             item.options = ser.validated_data["options"]
-        
+
         item.save()
 
         # 최신 product/이미지 프리패치 후 반환
         item = get_cart_item_prefetch_queryset().get(pk=item.pk)
 
-        return Response(CartItemSerializer(item, context={"request": request}).data, status=200)
+        return Response(
+            CartItemSerializer(item, context={"request": request}).data, status=200
+        )
 
 
 # ─────────────────────────────────────────────────────────────
@@ -217,7 +228,7 @@ class CartItemDeleteByProductOptionAPI(APIView):
         responses={
             204: {"description": "아이템이 성공적으로 삭제됨"},
             400: {"description": "잘못된 요청 (option_key 누락 등)"},
-            404: {"description": "해당 상품+옵션 조합의 아이템을 찾을 수 없음"}
+            404: {"description": "해당 상품+옵션 조합의 아이템을 찾을 수 없음"},
         },
         tags=["Carts"],
     )
@@ -232,7 +243,9 @@ class CartItemDeleteByProductOptionAPI(APIView):
             option_key = (request.data or {}).get("option_key")
 
         if option_key is None:
-            return Response({"detail": "option_key is required"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"detail": "option_key is required"}, status=status.HTTP_400_BAD_REQUEST
+            )
 
         deleted, _ = CartItem.objects.filter(
             cart__user=request.user,
@@ -241,7 +254,9 @@ class CartItemDeleteByProductOptionAPI(APIView):
         ).delete()
 
         if deleted == 0:
-            return Response({"detail": "item_not_found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"detail": "item_not_found"}, status=status.HTTP_404_NOT_FOUND
+            )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -253,6 +268,7 @@ class CartItemDetailView(generics.DestroyAPIView):
     DELETE /api/v1/carts/items/<item_id>/
     본인 장바구니의 해당 item_id 한 줄만 삭제
     """
+
     permission_classes = [permissions.IsAuthenticated]
     lookup_url_kwarg = "item_id"
 
@@ -277,6 +293,7 @@ class CartClearView(APIView):
     DELETE /api/v1/carts/clear
     → 내 카트 전체 비우기
     """
+
     permission_classes = [permissions.IsAuthenticated]
 
     @extend_schema(

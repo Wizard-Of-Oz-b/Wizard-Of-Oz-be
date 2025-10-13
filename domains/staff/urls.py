@@ -1,2 +1,3 @@
-from django.urls import path
-urlpatterns = []
+from django.urls import URLPattern, URLResolver
+
+urlpatterns: list[URLPattern | URLResolver] = []

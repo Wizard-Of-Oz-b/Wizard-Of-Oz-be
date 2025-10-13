@@ -1,13 +1,15 @@
 from __future__ import annotations
 
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 from uuid import UUID
+
 from rest_framework import serializers
 
-from .models import Cart, CartItem
 from domains.catalog.models import Product
-from .services import add_or_update_item, make_option_key
 from domains.orders.utils import parse_option_key_safe
+
+from .models import Cart, CartItem
+from .services import add_or_update_item, make_option_key
 
 
 def _abs_url(request, url: Optional[str]) -> Optional[str]:
@@ -21,7 +23,9 @@ def _validate_option_key_value(v: str) -> str:
     if not v:
         return ""
     if not parse_option_key_safe(v):
-        raise serializers.ValidationError("옵션 형식이 잘못되었습니다. 예: size=L&color=red")
+        raise serializers.ValidationError(
+            "옵션 형식이 잘못되었습니다. 예: size=L&color=red"
+        )
     return v
 
 
@@ -73,8 +77,24 @@ class CartSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Cart
-        fields = ("id", "user", "expires_at", "updated_at", "items", "items_total", "item_count")
-        read_only_fields = ("id", "user", "expires_at", "updated_at", "items", "items_total", "item_count")
+        fields = (
+            "id",
+            "user",
+            "expires_at",
+            "updated_at",
+            "items",
+            "items_total",
+            "item_count",
+        )
+        read_only_fields = (
+            "id",
+            "user",
+            "expires_at",
+            "updated_at",
+            "items",
+            "items_total",
+            "item_count",
+        )
 
     def get_items_total(self, instance: Cart) -> str:
         return str(instance.total_price)
@@ -92,9 +112,10 @@ class AddCartItemSerializer(serializers.Serializer):
       2) options: {"size":"L", "color":"red"}
     - 둘 다 비우면 '옵션 없음'
     """
+
     # 유연성 확보: 둘 다 문자열(UUID)로 받고 직접 조회
-    product = serializers.CharField(required=False)      # UUID 문자열
-    product_id = serializers.CharField(required=False)   # UUID 문자열 (alias)
+    product = serializers.CharField(required=False)  # UUID 문자열
+    product_id = serializers.CharField(required=False)  # UUID 문자열 (alias)
 
     quantity = serializers.IntegerField(min_value=1, default=1)
 
@@ -104,7 +125,9 @@ class AddCartItemSerializer(serializers.Serializer):
 
     def _resolve_product(self, value: Optional[str]) -> Product:
         if not value:
-            raise serializers.ValidationError({"product": "product 또는 product_id는 필수입니다."})
+            raise serializers.ValidationError(
+                {"product": "product 또는 product_id는 필수입니다."}
+            )
         try:
             pk = UUID(str(value))
         except Exception:
@@ -112,7 +135,9 @@ class AddCartItemSerializer(serializers.Serializer):
         try:
             return Product.objects.get(pk=pk)
         except Product.DoesNotExist:
-            raise serializers.ValidationError({"product": "해당 product를 찾을 수 없습니다."})
+            raise serializers.ValidationError(
+                {"product": "해당 product를 찾을 수 없습니다."}
+            )
 
     def validate_option_key(self, v: str) -> str:
         return _validate_option_key_value(v)
@@ -126,7 +151,9 @@ class AddCartItemSerializer(serializers.Serializer):
         od = attrs.get("options", None)
 
         if ok is not None and od is not None:
-            raise serializers.ValidationError({"option_key": "option_key와 options는 동시에 보낼 수 없습니다."})
+            raise serializers.ValidationError(
+                {"option_key": "option_key와 options는 동시에 보낼 수 없습니다."}
+            )
 
         if ok is None and od is None:
             attrs["option_key"] = ""  # 옵션 없음
@@ -139,37 +166,43 @@ class AddCartItemSerializer(serializers.Serializer):
         product: Product = validated["product_obj"]
         quantity: int = validated.get("quantity", 1)
 
-        option_key: Optional[str] = validated.get("option_key", None)
-        options: Optional[Dict[str, Any]] = validated.get("options", None)
+        option_key: Optional[str] = validated.get("option_key")
+        options: Optional[Dict[str, Any]] = validated.get("options")
 
-        # option_key -> options
+        # option_key → options
         if option_key is not None:
             if option_key.strip():
                 parsed = parse_option_key_safe(option_key)
                 if parsed is None:
-                    raise serializers.ValidationError({"option_key": "옵션 형식이 잘못되었습니다."})
+                    raise serializers.ValidationError(
+                        {"option_key": "옵션 형식이 잘못되었습니다."}
+                    )
                 options = parsed
             else:
                 options = {}
 
-        # options -> option_key
+        # options → option_key
         if options is not None and option_key is None:
             option_key = make_option_key(options)
 
-        base_kwargs = dict(
-            user=user,
-            product=product,           # 서비스가 product 객체를 받는 구현
-            options=options or {},
-            quantity=quantity,
-            unit_price=product.price,
-        )
-
-        # 서비스 시그니처 편차 흡수 (option_key 요구/불요)
+        # 명시적 호출 (mypy-friendly)
         try:
-            cart, item = add_or_update_item(option_key=option_key or "", **base_kwargs)
+            cart, item = add_or_update_item(
+                user=user,
+                product=product,
+                options=options or {},
+                quantity=quantity,
+                unit_price=product.price,
+                option_key=option_key or "",
+            )
         except TypeError:
-            cart, item = add_or_update_item(**base_kwargs)
-
+            cart, item = add_or_update_item(
+                user=user,
+                product=product,
+                options=options or {},
+                quantity=quantity,
+                unit_price=product.price,
+            )
         return item
 
     def to_representation(self, instance: CartItem) -> Dict[str, Any]:
@@ -181,11 +214,13 @@ class AddCartItemSerializer(serializers.Serializer):
 # ---------------------------
 class UpdateCartQtySerializer(serializers.Serializer):
     """장바구니 아이템 수량 변경용 시리얼라이저"""
+
     quantity = serializers.IntegerField(min_value=1)
 
 
 class UpdateCartItemSerializer(serializers.Serializer):
     """장바구니 아이템 수량 및 옵션 변경용 시리얼라이저"""
+
     quantity = serializers.IntegerField(min_value=1, required=False)
     option_key = serializers.CharField(required=False, allow_blank=True, default="")
     options = serializers.JSONField(required=False, default=dict)

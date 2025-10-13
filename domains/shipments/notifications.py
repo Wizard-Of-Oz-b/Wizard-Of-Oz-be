@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, Optional
 from dataclasses import asdict, dataclass
-from urllib.request import Request, urlopen
+from typing import Any, Dict, Optional
 from urllib.error import URLError
+from urllib.request import Request, urlopen
+
 from django.conf import settings
+
 
 @dataclass
 class ShipmentSnapshot:
@@ -21,20 +23,30 @@ class ShipmentSnapshot:
     delivered_at: Optional[str]
     canceled_at: Optional[str]
 
+
 def _dump_shipment(shipment) -> Dict[str, Any]:
-    return asdict(ShipmentSnapshot(
-        id=str(shipment.id),
-        carrier=shipment.carrier,
-        tracking_number=shipment.tracking_number,
-        status=shipment.status,
-        last_event_status=shipment.last_event_status,
-        last_event_at=shipment.last_event_at.isoformat() if shipment.last_event_at else None,
-        last_event_loc=shipment.last_event_loc or "",
-        last_event_desc=shipment.last_event_desc or "",
-        shipped_at=shipment.shipped_at.isoformat() if shipment.shipped_at else None,
-        delivered_at=shipment.delivered_at.isoformat() if shipment.delivered_at else None,
-        canceled_at=shipment.canceled_at.isoformat() if shipment.canceled_at else None,
-    ))
+    return asdict(
+        ShipmentSnapshot(
+            id=str(shipment.id),
+            carrier=shipment.carrier,
+            tracking_number=shipment.tracking_number,
+            status=shipment.status,
+            last_event_status=shipment.last_event_status,
+            last_event_at=(
+                shipment.last_event_at.isoformat() if shipment.last_event_at else None
+            ),
+            last_event_loc=shipment.last_event_loc or "",
+            last_event_desc=shipment.last_event_desc or "",
+            shipped_at=shipment.shipped_at.isoformat() if shipment.shipped_at else None,
+            delivered_at=(
+                shipment.delivered_at.isoformat() if shipment.delivered_at else None
+            ),
+            canceled_at=(
+                shipment.canceled_at.isoformat() if shipment.canceled_at else None
+            ),
+        )
+    )
+
 
 def _post_json(url: str, payload: Dict[str, Any]) -> None:
     body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -42,7 +54,10 @@ def _post_json(url: str, payload: Dict[str, Any]) -> None:
     with urlopen(req, timeout=5) as _:
         pass
 
-def send_notification(kind: str, shipment, meta: Optional[Dict[str, Any]] = None) -> None:
+
+def send_notification(
+    kind: str, shipment, meta: Optional[Dict[str, Any]] = None
+) -> None:
     """
     kind: "events_appended" | "status_changed"
     meta: 자유 필드 (예: {"created":3, "latest_event": {...}} 등)

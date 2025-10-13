@@ -1,8 +1,10 @@
 import pytest
 from rest_framework.test import APIClient
 
+
 def _j(resp):
     return resp.json() if hasattr(resp, "json") else {}
+
 
 def _as_list(data):
     # [{...}] / {"results":[...]} / {...}(단일) 모두 리스트로 정규화
@@ -14,9 +16,11 @@ def _as_list(data):
         return [data]
     return []
 
+
 def _pick_id(obj):
     # id 키가 없을 수 있어 address_id 도 허용
     return obj.get("id") or obj.get("address_id")
+
 
 def _get_field(obj, *candidates, default=None):
     # postcode/zip, address1/addr1, address2/addr2 등 다양한 이름 지원
@@ -105,7 +109,9 @@ def test_register_login_me_and_addresses(user_factory):
     # 6) 기본 주소 설정 (전용 엔드포인트가 있으면 사용)
     resp_setdef = c.post(f"/api/v1/users/me/addresses/{addr_id}/set-default/")
     # 어떤 구현은 200/204/201 중 하나를 반환하거나 404(엔드포인트 미구현)일 수 있음
-    assert resp_setdef.status_code in (200, 201, 204, 404), getattr(resp_setdef, "data", resp_setdef.content)
+    assert resp_setdef.status_code in (200, 201, 204, 404), getattr(
+        resp_setdef, "data", resp_setdef.content
+    )
 
     # 7) 목록에서 기본값 반영 확인(응답 형태에 무관하게 검사)
     r = c.get("/api/v1/users/me/addresses/")
@@ -114,6 +120,8 @@ def test_register_login_me_and_addresses(user_factory):
     # 단일 객체 구현도 items[0]로 동작하게 통일
     assert items, "address list empty after creation"
     # 기본 주소가 하나 이상 존재하는지만 확인(프로젝트가 is_default 필드를 노출하지 않을 수도 있음)
-    has_default_flag = any(it.get("is_default") is True for it in items if isinstance(it, dict))
+    has_default_flag = any(
+        it.get("is_default") is True for it in items if isinstance(it, dict)
+    )
     # is_default 미노출인 구현은 단순 존재 확인까지만 통과로 처리
     assert has_default_flag or True

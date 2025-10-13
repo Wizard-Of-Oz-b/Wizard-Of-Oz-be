@@ -1,17 +1,22 @@
 from __future__ import annotations
-from typing import Optional, Dict, Any
 
+from typing import Any, Dict, Optional
+
+from django.apps import apps
 from django.db import transaction
 from django.utils import timezone
-from django.apps import apps
+
 from rest_framework.exceptions import ValidationError
+
 
 # ===== 모델 지연 로딩 헬퍼 =====
 def Payment():
     return apps.get_model("payments", "Payment")
 
+
 def PaymentEvent():
     return apps.get_model("payments", "PaymentEvent")
+
 
 # ===== 상태 문자열 상수(순환 방지용) =====
 ORDER_STATUS_READY = "ready"
@@ -26,7 +31,10 @@ PAYMENT_STATUS_CANCELED = "canceled"
 
 
 def _record_event(
-    *, payment_obj, source: str, event_type: str,
+    *,
+    payment_obj,
+    source: str,
+    event_type: str,
     provider_status: Optional[str] = None,
     payload: Optional[Dict[str, Any]] = None,
     dedupe_key: Optional[str] = None,
@@ -80,7 +88,12 @@ def create_payment_stub(order, *, amount: Optional[Any] = None):
 
 
 @transaction.atomic
-def confirm_payment(payment_obj, *, provider_payment_key: Optional[str], provider_payload: Optional[Dict[str, Any]] = None):
+def confirm_payment(
+    payment_obj,
+    *,
+    provider_payment_key: Optional[str],
+    provider_payload: Optional[Dict[str, Any]] = None,
+):
     """
     승인(컨펌) 완료:
     - Payment: ready/in_progress/waiting_for_deposit -> paid
@@ -90,10 +103,18 @@ def confirm_payment(payment_obj, *, provider_payment_key: Optional[str], provide
     if getattr(payment_obj, "status") == PAYMENT_STATUS_PAID:
         return payment_obj
 
-    if payment_obj.status not in (PAYMENT_STATUS_READY, PAYMENT_STATUS_IN_PROGRESS, PAYMENT_STATUS_WAITING_FOR_DEPOSIT):
-        raise ValidationError({"payment": f"invalid state to confirm: {payment_obj.status}"})
+    if payment_obj.status not in (
+        PAYMENT_STATUS_READY,
+        PAYMENT_STATUS_IN_PROGRESS,
+        PAYMENT_STATUS_WAITING_FOR_DEPOSIT,
+    ):
+        raise ValidationError(
+            {"payment": f"invalid state to confirm: {payment_obj.status}"}
+        )
 
-    payment_obj.provider_payment_key = provider_payment_key or payment_obj.provider_payment_key
+    payment_obj.provider_payment_key = (
+        provider_payment_key or payment_obj.provider_payment_key
+    )
     payment_obj.status = PAYMENT_STATUS_PAID
     payment_obj.approved_at = timezone.now()
     payment_obj.updated_at = timezone.now()
@@ -106,7 +127,11 @@ def confirm_payment(payment_obj, *, provider_payment_key: Optional[str], provide
             event_type="approval",
             provider_status=payment_obj.status,
             payload=provider_payload,
-            dedupe_key=(provider_payload.get("transactionKey") if isinstance(provider_payload, dict) else None),
+            dedupe_key=(
+                provider_payload.get("transactionKey")
+                if isinstance(provider_payload, dict)
+                else None
+            ),
         )
 
     order = payment_obj.order
@@ -115,7 +140,8 @@ def confirm_payment(payment_obj, *, provider_payment_key: Optional[str], provide
         order.save(update_fields=["status"])
 
     # 카트 비우기 (지연 import)
-    from domains.carts.services import get_user_cart, clear_cart as clear_cart_items
+    from domains.carts.services import clear_cart as clear_cart_items, get_user_cart
+
     cart = get_user_cart(order.user, create=False)
     clear_cart_items(cart)
 
@@ -123,7 +149,9 @@ def confirm_payment(payment_obj, *, provider_payment_key: Optional[str], provide
 
 
 @transaction.atomic
-def cancel_payment(payment_obj, *, reason: str = "", provider_payload: Optional[Dict[str, Any]] = None):
+def cancel_payment(
+    payment_obj, *, reason: str = "", provider_payload: Optional[Dict[str, Any]] = None
+):
     """
     승인 전 취소:
     - Payment: canceled
@@ -137,6 +165,7 @@ def cancel_payment(payment_obj, *, reason: str = "", provider_payload: Optional[
     if getattr(order, "status") == ORDER_STATUS_READY:
         # 재고 복구 (지연 import)
         from domains.catalog.services import release_stock
+
         for oi in order.items.all():
             release_stock(oi.product_id, oi.option_key or "", oi.quantity)
         order.status = ORDER_STATUS_CANCELED

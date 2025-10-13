@@ -1,5 +1,6 @@
 from django.contrib import admin
-from .models import Purchase, OrderItem
+
+from .models import OrderItem, Purchase
 
 
 @admin.register(Purchase)
@@ -25,7 +26,6 @@ class PurchaseAdmin(admin.ModelAdmin):
         "pg_tid",
     )
     ordering = ("-purchased_at",)
-
 
 
 @admin.register(OrderItem)

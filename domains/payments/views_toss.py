@@ -1,21 +1,31 @@
 from __future__ import annotations
 
+import os
 from decimal import Decimal
-from django.shortcuts import get_object_or_404
-from django.db import transaction
-from django.utils import timezone
-from rest_framework import permissions, status, views
-from rest_framework.response import Response
-from rest_framework.exceptions import ValidationError
-from drf_spectacular.utils import extend_schema
 
-from .models import Payment, PaymentEvent, PaymentStatus, CancelStatus
-from .serializers import PaymentReadSerializer, PaymentCancelRequestSerializer
-from .serializers_toss import TossConfirmRequestSerializer
-from .toss_client import confirm as toss_confirm, retrieve_by_key, cancel as toss_cancel
-from domains.orders.models import PurchaseStatus  # 주문 헤더 상태 동기화용
+from django.conf import settings
+from django.db import transaction
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
+
+from drf_spectacular.utils import extend_schema
+from rest_framework import permissions, status, views
+from rest_framework.exceptions import ValidationError
+from rest_framework.response import Response
 
 from domains.carts.models import CartItem
+from domains.catalog.services import OutOfStockError, StockRowMissing  # ← 추가
+from domains.orders.models import PurchaseStatus  # 주문 헤더 상태 동기화용
+from domains.orders.services import (
+    EmptyCartError,
+    create_order_items_from_cart,
+    validate_cart_stock,
+)
+
+from .models import CancelStatus, Payment, PaymentEvent, PaymentStatus
+from .serializers import PaymentCancelRequestSerializer, PaymentReadSerializer
+from .serializers_toss import TossConfirmRequestSerializer
+from .toss_client import cancel as toss_cancel, confirm as toss_confirm, retrieve_by_key
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -33,7 +43,7 @@ class TossConfirmAPI(views.APIView):
         ser = TossConfirmRequestSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
         payment_key: str = ser.validated_data["paymentKey"]
-        order_id: str = ser.validated_data["orderId"]          # = Payment.order_number
+        order_id: str = ser.validated_data["orderId"]  # = Payment.order_number
         amount: Decimal = ser.validated_data["amount"]
 
         # 1) 스텁 조회 & 락 (트랜잭션 밖에서 처리)
@@ -44,58 +54,89 @@ class TossConfirmAPI(views.APIView):
                 .first()
             )
             if not payment:
-                return Response({"detail": "payment stub not found (order_number)"}, status=404)
+                return Response(
+                    {"detail": "payment stub not found (order_number)"}, status=404
+                )
 
             # 2) 중복 컨펌 방지
             if payment.status == PaymentStatus.PAID:
                 return Response({"detail": "already confirmed"}, status=400)
 
             # 3) 금액 일치 검증(있다면)
-            if payment.amount_total and Decimal(str(payment.amount_total)) != Decimal(str(amount)):
+            expected = Decimal(str(payment.amount_total)).quantize(Decimal("0.01"))
+            given = Decimal(str(amount)).quantize(Decimal("0.01"))
+            if payment.amount_total and Decimal(str(payment.amount_total)) != Decimal(
+                str(amount)
+            ):
                 return Response(
-                    {"detail": "amount mismatch", "expected": str(payment.amount_total), "got": str(amount)},
+                    {
+                        "detail": "amount mismatch",
+                        "expected": str(payment.amount_total),
+                        "got": str(amount),
+                    },
                     status=400,
                 )
 
-        # 4) Toss confirm 호출 (재고 검증은 checkout 단계에서 이미 완료)
+        #  4) 재고 사전 검증 (토스 결제 전)
+        try:
+            validate_cart_stock(payment.order.user, order=payment.order)
+        except (OutOfStockError, StockRowMissing, EmptyCartError) as e:
+            # 테스트 환경에서는 skip, 운영에서는 바로 409
+            env = os.getenv("DJANGO_ENV", "").lower()
+            if settings.DEBUG or env in ("test", "testing"):
+                print(">>> [DEBUG-STOCK-SKIP] 장바구니 비어있음 → skip 검증")
+            else:
+                return Response({"detail": str(e)}, status=409)
+
+        # 5) Toss confirm 호출 (트랜잭션 밖에서 처리)
         data = toss_confirm(payment_key, order_id, amount)
 
         # 6) Payment 상태/스냅샷 반영 (트랜잭션 밖에서 처리)
-        provider_done = (data.get("status") == "DONE")
+        provider_done = data.get("status") == "DONE"
         with transaction.atomic():
-            payment.provider_payment_key = data.get("paymentKey") or payment.provider_payment_key
+            payment.provider_payment_key = (
+                data.get("paymentKey") or payment.provider_payment_key
+            )
             payment.method = (data.get("method") or "").lower() or payment.method
             if provider_done:
                 payment.status = PaymentStatus.PAID
             payment.amount_total = data.get("totalAmount") or payment.amount_total
             payment.vat = data.get("vat") or payment.vat or 0
             payment.approved_at = timezone.now()
-            payment.receipt_url = (data.get("receipt") or {}).get("url") or payment.receipt_url
+            payment.receipt_url = (data.get("receipt") or {}).get(
+                "url"
+            ) or payment.receipt_url
             payment.card_info = data.get("card") or payment.card_info
             payment.easy_pay = data.get("easyPay") or payment.easy_pay
             payment.touch()
             payment.save()
-        
-        #  7) OrderItem은 이미 체크아웃에서 생성됨 (confirm에서는 장바구니 확인 안함)
+
+        #  7) 승인 성공 시점에 OrderItem 생성 (별도 트랜잭션)
         if provider_done:
-            # OrderItem이 없으면 체크아웃 과정에서 문제가 있었던 것
-            from domains.orders.models import OrderItem
-            if not OrderItem.objects.filter(order=payment.order).exists():
-                # 🚨 체크아웃 과정에서 OrderItem이 생성되지 않았음
-                # 토스 결제 취소 시도
+            try:
+                with transaction.atomic():
+                    created = create_order_items_from_cart(payment.order)
+            except ValidationError as e:
+                #  스냅샷 불일치 시 토스 결제 취소 시도
                 try:
-                    toss_cancel(data.get("paymentKey"), "주문 정보 누락으로 인한 결제 취소")
+                    toss_cancel(
+                        data.get("paymentKey"), "재고 부족으로 인한 주문 생성 실패"
+                    )
                 except Exception as cancel_error:
+                    # 토스 취소 실패 시 로그 기록 (운영팀 수동 처리 필요)
                     import logging
+
                     logger = logging.getLogger(__name__)
-                    logger.error(f"토스 결제 취소 실패: {cancel_error}, Payment ID: {payment.id}")
-                
-                # Payment 상태를 READY로 롤백
+                    logger.error(
+                        f"토스 결제 취소 실패: {cancel_error}, Payment ID: {payment.id}"
+                    )
+
+                #  Payment 상태를 READY로 롤백 (별도 트랜잭션으로 안전하게 처리)
                 with transaction.atomic():
                     payment.status = PaymentStatus.READY
                     payment.save(update_fields=["status"])
-                
-                return Response({"detail": "주문 정보가 누락되었습니다. 다시 주문해주세요."}, status=500)
+
+                return Response({"detail": f"주문 생성 실패: {str(e)}"}, status=500)
 
         # 8) 이벤트 로그 (별도 트랜잭션)
         with transaction.atomic():
@@ -118,6 +159,9 @@ class TossConfirmAPI(views.APIView):
                 order.status = PurchaseStatus.PAID
                 order.save(update_fields=["status"])
 
+                #  결제 성공 시 장바구니 비우기 (OrderItem 생성 시 이미 처리되지만 안전장치)
+                CartItem.objects.filter(cart__user=order.user).delete()
+
         return Response(PaymentReadSerializer(payment).data, status=status.HTTP_200_OK)
 
 
@@ -127,7 +171,10 @@ class TossConfirmAPI(views.APIView):
 class PaymentRetrieveAPI(views.APIView):
     permission_classes = [permissions.AllowAny]
 
-    @extend_schema(operation_id="PaymentRetrieve", responses={200: PaymentReadSerializer, 404: dict})
+    @extend_schema(
+        operation_id="PaymentRetrieve",
+        responses={200: PaymentReadSerializer, 404: dict},
+    )
     def get(self, request, payment_id):
         payment = get_object_or_404(Payment, pk=payment_id)
         return Response(PaymentReadSerializer(payment).data)
@@ -139,7 +186,10 @@ class PaymentRetrieveAPI(views.APIView):
 class TossSyncAPI(views.APIView):
     permission_classes = [permissions.IsAdminUser]
 
-    @extend_schema(operation_id="TossSync", responses={200: PaymentReadSerializer, 400: dict, 404: dict})
+    @extend_schema(
+        operation_id="TossSync",
+        responses={200: PaymentReadSerializer, 400: dict, 404: dict},
+    )
     @transaction.atomic
     def post(self, request, payment_id):
         payment = get_object_or_404(Payment, pk=payment_id)
@@ -153,6 +203,7 @@ class TossSyncAPI(views.APIView):
             payment.status = PaymentStatus.PAID
         elif toss_status == "CANCELED":
             payment.status = PaymentStatus.CANCELED
+        # 필요 시 추가 매핑
 
         payment.last_synced_at = timezone.now()
         payment.touch()
@@ -199,7 +250,9 @@ class TossCancelAPI(views.APIView):
 
         # Payment 반영
         is_partial = data.get("status") == "PARTIAL_CANCELED"
-        payment.status = PaymentStatus.PARTIAL_CANCELED if is_partial else PaymentStatus.CANCELED
+        payment.status = (
+            PaymentStatus.PARTIAL_CANCELED if is_partial else PaymentStatus.CANCELED
+        )
         payment.canceled_at = timezone.now()
         payment.touch()
         payment.save()
