@@ -1,3 +1,4 @@
+from datetime import timedelta
 from typing import Any
 from urllib.parse import urlencode
 
@@ -27,12 +28,13 @@ User = get_user_model()
 # refresh 쿠키 유틸
 # ───────────────────────────────────────────────
 def _refresh_cookie_max_age() -> int | None:
-    cfg = getattr(settings, "SIMPLE_JWT", {})
+    cfg: dict[str, Any] = getattr(settings, "SIMPLE_JWT", {})
     lifetime = cfg.get("REFRESH_TOKEN_LIFETIME")
-    try:
+
+    # 타입이 timedelta인지 안전하게 확인
+    if isinstance(lifetime, timedelta):
         return int(lifetime.total_seconds())
-    except Exception:
-        return None
+    return None
 
 
 def set_refresh_cookie(response: Response, refresh_token: str) -> None:
