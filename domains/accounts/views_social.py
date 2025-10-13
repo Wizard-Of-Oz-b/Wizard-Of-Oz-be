@@ -19,6 +19,7 @@ from .social import (
     fetch_userinfo,
     generate_authorize_url,
 )
+
 User = get_user_model()
 
 
