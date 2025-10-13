@@ -80,9 +80,7 @@ class SocialAuthorizeView(generics.GenericAPIView):
             authorize_url = generate_authorize_url(provider, request)
             return HttpResponseRedirect(authorize_url)
         except SocialAuthError as e:
-            return Response(
-                {"detail": f"{provider} authorize error: {e}"}, status=400
-            )
+            return Response({"detail": f"{provider} authorize error: {e}"}, status=400)
 
 
 # ───────────────────────────────────────────────
@@ -138,23 +136,17 @@ class SocialLoginView(generics.GenericAPIView):
             token_data = exchange_code_for_tokens(provider, code, redirect_uri, state)
             provider_access = token_data["access_token"]
         except (SocialAuthError, RequestException) as e:
-            return Response(
-                {"detail": f"OAuth token exchange failed: {e}"}, status=400
-            )
+            return Response({"detail": f"OAuth token exchange failed: {e}"}, status=400)
 
         # 사용자 프로필 조회
         try:
             userinfo = fetch_userinfo(provider, provider_access)
         except (SocialAuthError, RequestException) as e:
-            return Response(
-                {"detail": f"Failed to fetch userinfo: {e}"}, status=400
-            )
+            return Response({"detail": f"Failed to fetch userinfo: {e}"}, status=400)
 
         email = userinfo.get("email")
         if not email:
-            return Response(
-                {"detail": "email not provided by provider"}, status=400
-            )
+            return Response({"detail": "email not provided by provider"}, status=400)
 
         # 유저 매핑 / 생성
         user = User.objects.filter(email=email).first()
@@ -202,4 +194,3 @@ class SocialUnlinkView(generics.GenericAPIView):
         return Response(
             {"message": f"{provider} 계정 연동이 해제되었습니다."}, status=200
         )
-
