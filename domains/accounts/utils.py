@@ -1,6 +1,7 @@
-from django.conf import settings
-from django import get_version
 import re
+
+from django import get_version
+from django.conf import settings
 
 
 def refresh_cookie_kwargs(debug: bool = False) -> dict:
