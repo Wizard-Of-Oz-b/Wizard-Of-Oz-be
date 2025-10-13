@@ -1,27 +1,24 @@
-from urllib.parse import urlencode
 from typing import Any
+from urllib.parse import urlencode
 
 from django.conf import settings
-from django.http import HttpResponseRedirect
 from django.contrib.auth import get_user_model
-from requests.exceptions import RequestException
+from django.http import HttpResponseRedirect
 
 from drf_spectacular.utils import OpenApiParameter, extend_schema
+from requests.exceptions import RequestException
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from .models import SocialAccount
 from .social import (
     SocialAuthError,
     _provider_config,
-    generate_authorize_url,
     exchange_code_for_tokens,
     fetch_userinfo,
+    generate_authorize_url,
 )
-from .models import SocialAccount
-from .utils import refresh_cookie_kwargs
-
-
 User = get_user_model()
 
 
